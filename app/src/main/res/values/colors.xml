@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light Theme Colors -->
+    <color name="light_background">#FFFFFF</color>
+    <color name="light_text">#000000</color>
+    <color name="light_text_secondary">#666666</color>
+    <color name="light_edit_background">#F5F5F5</color>
+
+    <!-- Dark Theme Colors -->
+    <color name="dark_background">#121212</color>
+    <color name="dark_text">#FFFFFF</color>
+    <color name="dark_text_secondary">#B0B0B0</color>
+    <color name="dark_edit_background">#1E1E1E</color>
+
+    <!-- Sepia Theme Colors -->
+    <color name="sepia_background">#F4ECD8</color>
+    <color name="sepia_text">#3E2723</color>
+    <color name="sepia_text_secondary">#6D4C41</color>
+    <color name="sepia_edit_background">#EDE0C8</color>
+</resources>

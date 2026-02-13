@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light Theme -->
+    <style name="AppTheme.Light" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorPrimaryDark">#1976D2</item>
+        <item name="colorAccent">#FF4081</item>
+        <item name="android:windowBackground">@color/light_background</item>
+        <item name="android:textColorPrimary">@color/light_text</item>
+        <item name="android:textColorSecondary">@color/light_text_secondary</item>
+    </style>
+
+    <!-- Dark Theme -->
+    <style name="AppTheme.Dark" parent="Theme.AppCompat">
+        <item name="colorPrimary">#212121</item>
+        <item name="colorPrimaryDark">#000000</item>
+        <item name="colorAccent">#64FFDA</item>
+        <item name="android:windowBackground">@color/dark_background</item>
+        <item name="android:textColorPrimary">@color/dark_text</item>
+        <item name="android:textColorSecondary">@color/dark_text_secondary</item>
+    </style>
+
+    <!-- Sepia Theme -->
+    <style name="AppTheme.Sepia" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="colorPrimary">#8B6F47</item>
+        <item name="colorPrimaryDark">#6B5437</item>
+        <item name="colorAccent">#D4A574</item>
+        <item name="android:windowBackground">@color/sepia_background</item>
+        <item name="android:textColorPrimary">@color/sepia_text</item>
+        <item name="android:textColorSecondary">@color/sepia_text_secondary</item>
+    </style>
+</resources>
