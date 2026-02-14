@@ -6,7 +6,7 @@
     <!-- UI Labels -->
     <string name="title_text">Rolling Text</string>
     <string name="hint_text">Start typing…</string>
-    <string name="default_counter">0 / 255</string>
+    <string name="default_counter">0 / 128</string>
     <string name="limit_label">(oldest text removed when limit reached)</string>
     <string name="char_counter_format">%1$d / %2$d</string>
 
@@ -19,12 +19,14 @@
     <string name="desc_change_limit">Change character limit</string>
     <string name="desc_choose_font">Choose font</string>
     <string name="desc_change_theme">Change theme. Current theme is %s mode</string>
+    <string name="desc_change_font_size">Change font size</string>
 
     <!-- Dialog titles -->
     <string name="dialog_title_limit">Set Character Limit</string>
     <string name="dialog_title_warning">Warning</string>
     <string name="dialog_title_theme">Select Theme</string>
     <string name="dialog_title_font">Select Font</string>
+    <string name="dialog_title_font_size">Set Font Size</string>
     <string name="dialog_title_error">Invalid Input</string>
 
     <!-- Dialog messages -->
