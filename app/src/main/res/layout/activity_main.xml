@@ -18,7 +18,7 @@
         android:id="@+id/titleText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Rolling Text"
+        android:text="@string/title_text"
         android:textSize="24sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
@@ -31,9 +31,8 @@
         android:layout_height="0dp"
         android:layout_marginTop="16dp"
         android:layout_marginBottom="16dp"
-        android:background="@android:drawable/editbox_background"
         android:gravity="top|start"
-        android:hint="Start typing..."
+        android:hint="@string/hint_text"
         android:inputType="textMultiLine|textNoSuggestions"
         android:padding="12dp"
         android:textSize="16sp"
@@ -61,7 +60,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="0 / 255"
+            android:text="@string/default_counter"
             android:textSize="14sp"
             android:textColor="#666666" />
 
@@ -69,7 +68,7 @@
             android:id="@+id/limitLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="(oldest text removed when limit reached)"
+            android:text="@string/limit_label"
             android:textSize="12sp"
             android:textStyle="italic"
             android:textColor="#999999" />
@@ -92,23 +91,23 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:text="Char Limit"
-            android:contentDescription="Change character limit" />
+            android:text="@string/button_char_limit"
+            android:contentDescription="@string/desc_change_limit" />
 
         <Button
             android:id="@+id/themeButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:text="Theme"
-            android:contentDescription="Change theme" />
+            android:text="@string/button_theme"
+            android:contentDescription="@string/desc_change_theme" />
 
         <Button
             android:id="@+id/fontButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Font"
-            android:contentDescription="Choose font" />
+            android:text="@string/button_font"
+            android:contentDescription="@string/desc_choose_font" />
 
     </LinearLayout>
 

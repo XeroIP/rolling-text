@@ -92,3 +92,18 @@ lint/tmp/
 *~
 *.swp
 *.bak
+
+# Windows special files
+nul
+
+# .idea directory (IDE-specific)
+.idea/
+
+# Claude-specific
+.claude/
+
+# Release keys
+release-key/
+*.jks
+*.keystore
+

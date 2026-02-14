@@ -45,7 +45,7 @@ This version includes major improvements based on comprehensive code review:
 ## 📱 Screenshots
 
 | Light Theme | Dark Theme | Sepia Theme |
-|-------------|------------|-------------|
+|:------------|:-----------|:------------|
 | *Clean and bright* | *Easy on the eyes* | *Perfect for reading* |
 
 ## 🛠️ Technical Details
@@ -65,10 +65,11 @@ This version includes major improvements based on comprehensive code review:
 ### Option 1: Build from Source
 
 1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/rolling-text-android.git
-cd rolling-text-android
-```
+
+    ```bash
+    git clone https://github.com/yourusername/rolling-text-android.git
+    cd rolling-text-android
+    ```
 
 2. Open in Android Studio:
    - File → Open → Select the `rolling-text-android` folder

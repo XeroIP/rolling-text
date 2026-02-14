@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App name -->
+    <string name="app_name">Rolling Text</string>
+
+    <!-- UI Labels -->
+    <string name="title_text">Rolling Text</string>
+    <string name="hint_text">Start typing…</string>
+    <string name="default_counter">0 / 255</string>
+    <string name="limit_label">(oldest text removed when limit reached)</string>
+    <string name="char_counter_format">%1$d / %2$d</string>
+
+    <!-- Button labels -->
+    <string name="button_char_limit">Char Limit</string>
+    <string name="button_theme">Theme</string>
+    <string name="button_font">Font</string>
+
+    <!-- Content descriptions for accessibility -->
+    <string name="desc_change_limit">Change character limit</string>
+    <string name="desc_choose_font">Choose font</string>
+    <string name="desc_change_theme">Change theme. Current theme is %s mode</string>
+
+    <!-- Dialog titles -->
+    <string name="dialog_title_limit">Set Character Limit</string>
+    <string name="dialog_title_warning">Warning</string>
+    <string name="dialog_title_theme">Select Theme</string>
+    <string name="dialog_title_font">Select Font</string>
+    <string name="dialog_title_error">Invalid Input</string>
+
+    <!-- Dialog messages -->
+    <string name="dialog_loading_fonts">Loading fonts…</string>
+
+    <!-- Plurals for truncation warning -->
+    <plurals name="dialog_warning_truncate_plurals">
+        <item quantity="one">This will remove %d character from the beginning of your text. Continue?</item>
+        <item quantity="other">This will remove %d characters from the beginning of your text. Continue?</item>
+    </plurals>
+
+    <!-- Button labels for dialogs -->
+    <string name="button_ok">OK</string>
+    <string name="button_yes">Yes</string>
+    <string name="button_no">No</string>
+    <string name="button_cancel">Cancel</string>
+
+    <!-- Theme names -->
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_sepia">Sepia</string>
+
+    <!-- Font names -->
+    <string name="font_system_default">System Default</string>
+
+    <!-- Toast messages -->
+    <string name="toast_no_fonts">No custom fonts found on device</string>
+    <string name="toast_error_fonts">Error loading fonts</string>
+    <string name="toast_font_error">Could not load font. Using default.</string>
+    <string name="toast_font_too_large">Font file is too large. Using default.</string>
+
+    <!-- Error messages -->
+    <string name="error_invalid_number">Please enter a valid number</string>
+    <string name="error_number_range">Please enter a number between 1 and 1,000,000</string>
+
+    <!-- Accessibility announcements -->
+    <string name="announce_theme_changed">Theme changed to %s mode</string>
+</resources>

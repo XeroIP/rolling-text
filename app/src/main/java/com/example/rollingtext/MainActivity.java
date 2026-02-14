@@ -1,6 +1,5 @@
 package com.example.rollingtext;
 
-import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
@@ -16,20 +15,20 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
-import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Main activity for the RollingText app.
- * 
+ * <p>
  * This app maintains a rolling character limit - when the user exceeds the limit,
  * the oldest characters are automatically removed from the beginning of the text.
- * 
+ * <p>
  * Features:
  * - Rolling character limit with Unicode/emoji support
  * - Theme selection (Light, Dark, Sepia)
@@ -64,37 +63,23 @@ public class MainActivity extends AppCompatActivity {
     private Handler saveHandler;
     private Runnable saveRunnable;
     private static final int SAVE_DELAY_MS = 500; // Save 500ms after user stops typing
-    
-    // Lock for thread-safe isUpdating flag
-    private final Object updateLock = new Object();
-    private volatile boolean isUpdating = false;
-    
-    // Font caching to avoid reloading from disk
-    private Map<String, Typeface> typefaceCache = new HashMap<>();
-    
-    // Cached font list for performance
-    private List<File> cachedFonts = null;
-    
-    // Reusable drawable for EditText background (prevents recreation)
-    private GradientDrawable editTextDrawable = null;
 
-    /**
-     * Theme color configuration container.
-     * Holds all colors needed for a theme.
-     */
-    private static class ThemeColors {
-        int background;
-        int text;
-        int textSecondary;
-        int editBackground;
-        
-        ThemeColors(int bg, int txt, int txtSec, int editBg) {
-            background = bg;
-            text = txt;
-            textSecondary = txtSec;
-            editBackground = editBg;
-        }
-    }
+    // ExecutorService for background operations
+    private ExecutorService backgroundExecutor;
+
+    // Flag to prevent recursive updates (TextWatcher runs on main thread)
+    private boolean isUpdating = false;
+
+    // Font manager for font loading and caching
+    private FontManager fontManager;
+
+    // Theme manager for theme application
+    private ThemeManager themeManager;
+
+    // Cached LiveData values to avoid null checks
+    private int cachedMaxCharacters = 255;
+    private String cachedTheme = "light";
+    private String cachedFontPath = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,12 +88,21 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize repository
         preferencesRepo = new PreferencesRepository(this);
-        
+
         // Initialize ViewModel for configuration change handling
         viewModel = new ViewModelProvider(this).get(TextViewModel.class);
-        
+
+        // Initialize font manager
+        fontManager = new FontManager(this);
+
+        // Initialize theme manager
+        themeManager = new ThemeManager();
+
         // Initialize handler for debounced saves
         saveHandler = new Handler(Looper.getMainLooper());
+
+        // Initialize background executor for async operations
+        backgroundExecutor = Executors.newSingleThreadExecutor();
 
         // Initialize UI components
         initializeViews();
@@ -117,8 +111,8 @@ public class MainActivity extends AppCompatActivity {
         loadState(savedInstanceState);
         
         // Apply saved theme and font
-        applyTheme(viewModel.getCurrentTheme().getValue());
-        applyFont(viewModel.getCurrentFontPath().getValue());
+        applyTheme(cachedTheme);
+        applyFont(cachedFontPath);
 
         // Update counter initially
         updateCounter();
@@ -147,8 +141,8 @@ public class MainActivity extends AppCompatActivity {
         rootView = findViewById(android.R.id.content);
         
         // Set content descriptions for accessibility
-        settingsButton.setContentDescription("Change character limit");
-        fontButton.setContentDescription("Choose font");
+        settingsButton.setContentDescription(getString(R.string.desc_change_limit));
+        fontButton.setContentDescription(getString(R.string.desc_choose_font));
         
         // Make character counter less chatty for screen readers
         charCounter.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -164,31 +158,41 @@ public class MainActivity extends AppCompatActivity {
             viewModel.setMaxCharacters(savedInstanceState.getInt("max_chars", 255));
             viewModel.setCurrentTheme(savedInstanceState.getString("theme", "light"));
             viewModel.setCurrentFontPath(savedInstanceState.getString("font_path", null));
-            viewModel.setCurrentFontName(savedInstanceState.getString("font_name", "System Default"));
-            
+            viewModel.setCurrentFontName(savedInstanceState.getString("font_name", getString(R.string.font_system_default)));
+
             String savedText = savedInstanceState.getString("current_text", "");
             viewModel.setText(savedText);
             editText.setText(savedText);
             editText.setSelection(savedText.length());
-        } else if (viewModel.getText().getValue().isEmpty()) {
-            // First time initialization - load from SharedPreferences
-            int maxChars = preferencesRepo.getMaxCharacters();
-            String theme = preferencesRepo.getTheme();
-            String fontPath = preferencesRepo.getFontPath();
-            String fontName = preferencesRepo.getFontName();
-            String savedText = preferencesRepo.getText();
-            
-            viewModel.setMaxCharacters(maxChars);
-            viewModel.setCurrentTheme(theme);
-            viewModel.setCurrentFontPath(fontPath);
-            viewModel.setCurrentFontName(fontName);
-            viewModel.setText(savedText);
-            
-            editText.setText(savedText);
-            if (savedText != null && !savedText.isEmpty()) {
-                editText.setSelection(savedText.length());
+        } else {
+            String text = viewModel.getText().getValue();
+            if (text == null || text.isEmpty()) {
+                // First time initialization - load from SharedPreferences
+                int maxChars = preferencesRepo.getMaxCharacters();
+                String theme = preferencesRepo.getTheme();
+                String fontPath = preferencesRepo.getFontPath();
+                String fontName = preferencesRepo.getFontName();
+                String savedText = preferencesRepo.getText();
+
+                viewModel.setMaxCharacters(maxChars);
+                viewModel.setCurrentTheme(theme);
+                viewModel.setCurrentFontPath(fontPath);
+                viewModel.setCurrentFontName(fontName);
+                viewModel.setText(savedText);
+
+                editText.setText(savedText);
+                if (savedText != null && !savedText.isEmpty()) {
+                    editText.setSelection(savedText.length());
+                }
             }
         }
+
+        // Cache LiveData values for performance and null-safety
+        cachedMaxCharacters = viewModel.getMaxCharacters().getValue() != null ?
+            viewModel.getMaxCharacters().getValue() : 255;
+        cachedTheme = viewModel.getCurrentTheme().getValue() != null ?
+            viewModel.getCurrentTheme().getValue() : "light";
+        cachedFontPath = viewModel.getCurrentFontPath().getValue();
     }
 
     /**
@@ -196,9 +200,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void observeViewModel() {
         // Update theme button description when theme changes
-        viewModel.getCurrentTheme().observe(this, theme -> {
-            themeButton.setContentDescription("Change theme. Current theme is " + theme + " mode");
-        });
+        viewModel.getCurrentTheme().observe(this, theme -> themeButton.setContentDescription(getString(R.string.desc_change_theme, theme)));
     }
 
     /**
@@ -219,15 +221,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void afterTextChanged(Editable s) {
                 // Enforce character limit if not already updating
-                synchronized (updateLock) {
-                    if (!isUpdating) {
-                        enforceCharacterLimit(s);
-                    }
+                if (!isUpdating) {
+                    enforceCharacterLimit(s);
                 }
-                
+
                 // Update character counter
                 updateCounter();
-                
+
                 // Debounce save operation to prevent excessive I/O
                 debouncedSave(s.toString());
             }
@@ -248,7 +248,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Enforces the rolling character limit by removing oldest characters.
      * Uses Unicode code points to properly handle emoji and multi-byte characters.
-     * 
+     * <p>
      * CRITICAL FIX: Handles emoji correctly by counting code points instead of char units.
      * Example: "👨‍👩‍👧‍👦" (family emoji) is 1 code point, not 11 char units.
      * 
@@ -257,16 +257,14 @@ public class MainActivity extends AppCompatActivity {
     private void enforceCharacterLimit(Editable editable) {
         // Count actual Unicode characters (code points), not UTF-16 code units
         int codePointCount = Character.codePointCount(editable, 0, editable.length());
-        
-        if (codePointCount > viewModel.getMaxCharacters().getValue()) {
-            synchronized (updateLock) {
-                isUpdating = true;
-            }
-            
+
+        if (codePointCount > cachedMaxCharacters) {
+            isUpdating = true;
+
             try {
                 // Calculate how many code points to remove
-                int codePointsToRemove = codePointCount - viewModel.getMaxCharacters().getValue();
-                
+                int codePointsToRemove = codePointCount - cachedMaxCharacters;
+
                 // Find the char offset for the number of code points to remove
                 // This ensures we don't cut in the middle of a multi-byte character
                 int offsetToRemove = 0;
@@ -275,18 +273,16 @@ public class MainActivity extends AppCompatActivity {
                         Character.codePointAt(editable, offsetToRemove)
                     );
                 }
-                
+
                 // Remove characters from the beginning
                 editable.delete(0, offsetToRemove);
-                
+
                 // Move cursor to the end
                 editText.setSelection(editable.length());
             } catch (Exception e) {
                 Log.e(TAG, "Error enforcing character limit", e);
             } finally {
-                synchronized (updateLock) {
-                    isUpdating = false;
-                }
+                isUpdating = false;
             }
         }
     }
@@ -299,13 +295,13 @@ public class MainActivity extends AppCompatActivity {
         int currentLength = Character.codePointCount(
             editText.getText(), 0, editText.getText().length()
         );
-        charCounter.setText(currentLength + " / " + viewModel.getMaxCharacters().getValue());
+        charCounter.setText(getString(R.string.char_counter_format, currentLength, cachedMaxCharacters));
     }
 
     /**
      * Debounces save operations to prevent excessive I/O.
      * Saves 500ms after the user stops typing.
-     * 
+     * <p>
      * CRITICAL FIX: Prevents saving on every keystroke which caused poor performance.
      * 
      * @param text The text to save
@@ -330,15 +326,15 @@ public class MainActivity extends AppCompatActivity {
      */
     private void showLimitDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Set Character Limit");
+        builder.setTitle(R.string.dialog_title_limit);
 
         final EditText input = new EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        input.setText(String.valueOf(viewModel.getMaxCharacters().getValue()));
+        input.setText(String.valueOf(cachedMaxCharacters));
         input.setSelection(input.getText().length());
         builder.setView(input);
 
-        builder.setPositiveButton("OK", (dialog, which) -> {
+        builder.setPositiveButton(getString(R.string.button_ok), (dialog, which) -> {
             String inputText = input.getText().toString();
             if (!inputText.isEmpty()) {
                 try {
@@ -352,29 +348,25 @@ public class MainActivity extends AppCompatActivity {
                         if (newLimit < currentLength) {
                             int charsToRemove = currentLength - newLimit;
                             new AlertDialog.Builder(this)
-                                .setTitle("Warning")
-                                .setMessage("This will remove " + charsToRemove + 
-                                    " character" + (charsToRemove > 1 ? "s" : "") + 
-                                    " from the beginning of your text. Continue?")
-                                .setPositiveButton("Yes", (d, w) -> {
-                                    applyNewCharacterLimit(newLimit);
-                                })
-                                .setNegativeButton("No", null)
+                                .setTitle(R.string.dialog_title_warning)
+                                .setMessage(getResources().getQuantityString(R.plurals.dialog_warning_truncate_plurals, charsToRemove, charsToRemove))
+                                .setPositiveButton(R.string.button_yes, (d, w) -> applyNewCharacterLimit(newLimit))
+                                .setNegativeButton(R.string.button_no, null)
                                 .show();
                         } else {
                             applyNewCharacterLimit(newLimit);
                         }
                     } else {
-                        showErrorDialog("Please enter a number between 1 and 1,000,000");
+                        showErrorDialog(getString(R.string.error_number_range));
                     }
                 } catch (NumberFormatException e) {
-                    showErrorDialog("Please enter a valid number");
+                    showErrorDialog(getString(R.string.error_invalid_number));
                     Log.e(TAG, "Invalid number format", e);
                 }
             }
         });
-        
-        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        builder.setNegativeButton(getString(R.string.button_cancel), (dialog, which) -> dialog.cancel());
         builder.show();
     }
 
@@ -384,9 +376,10 @@ public class MainActivity extends AppCompatActivity {
      * @param newLimit The new character limit to apply
      */
     private void applyNewCharacterLimit(int newLimit) {
+        cachedMaxCharacters = newLimit;
         viewModel.setMaxCharacters(newLimit);
         preferencesRepo.saveMaxCharacters(newLimit);
-        
+
         // Enforce new limit on existing text
         Editable editable = editText.getText();
         enforceCharacterLimit(editable);
@@ -398,70 +391,71 @@ public class MainActivity extends AppCompatActivity {
      * Announces theme changes to screen readers for accessibility.
      */
     private void showThemeDialog() {
-        String[] themes = {"Light", "Dark", "Sepia"};
-        String currentTheme = viewModel.getCurrentTheme().getValue();
-        int currentSelection = currentTheme.equals("light") ? 0 : 
-                              currentTheme.equals("dark") ? 1 : 2;
-        
+        String[] themes = {
+            getString(R.string.theme_light),
+            getString(R.string.theme_dark),
+            getString(R.string.theme_sepia)
+        };
+        int currentSelection = cachedTheme.equals("light") ? 0 :
+                              cachedTheme.equals("dark") ? 1 : 2;
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Select Theme");
+        builder.setTitle(R.string.dialog_title_theme);
         builder.setSingleChoiceItems(themes, currentSelection, (dialog, which) -> {
             String selectedTheme = which == 0 ? "light" : which == 1 ? "dark" : "sepia";
+            cachedTheme = selectedTheme;
             viewModel.setCurrentTheme(selectedTheme);
             applyTheme(selectedTheme);
             preferencesRepo.saveTheme(selectedTheme);
-            
+
             // Announce theme change for accessibility
-            rootView.announceForAccessibility("Theme changed to " + selectedTheme + " mode");
-            
+            rootView.announceForAccessibility(getString(R.string.announce_theme_changed, selectedTheme));
+
             dialog.dismiss();
         });
-        builder.setNegativeButton("Cancel", null);
+        builder.setNegativeButton(R.string.button_cancel, null);
         builder.show();
     }
     
     /**
      * Shows dialog to select font.
      * Loads fonts asynchronously to prevent ANR (Application Not Responding).
-     * 
+     * <p>
      * CRITICAL FIX: Moved font scanning to background thread to prevent UI freeze.
      */
     private void showFontDialog() {
-        if (cachedFonts == null) {
-            // Show progress while loading fonts on background thread
-            AlertDialog progress = new AlertDialog.Builder(this)
-                .setMessage("Loading fonts...")
-                .setCancelable(false)
-                .create();
-            progress.show();
-            
-            // CRITICAL FIX: Load fonts on background thread to prevent ANR
-            new Thread(() -> {
-                try {
-                    List<File> fonts = getSystemFonts();
-                    
-                    runOnUiThread(() -> {
-                        progress.dismiss();
-                        cachedFonts = fonts;
-                        
-                        if (fonts.isEmpty()) {
-                            Toast.makeText(this, "No custom fonts found on device", 
-                                Toast.LENGTH_SHORT).show();
-                        }
-                        
-                        displayFontDialog(fonts);
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "Error loading fonts", e);
-                    runOnUiThread(() -> {
-                        progress.dismiss();
-                        Toast.makeText(this, "Error loading fonts", Toast.LENGTH_SHORT).show();
-                    });
-                }
-            }).start();
-        } else {
-            displayFontDialog(cachedFonts);
-        }
+        // Show progress while loading fonts
+        AlertDialog progress = new AlertDialog.Builder(this)
+            .setMessage(R.string.dialog_loading_fonts)
+            .setCancelable(false)
+            .create();
+        progress.show();
+
+        // Load fonts asynchronously using FontManager
+        fontManager.loadFonts(backgroundExecutor, new FontManager.FontLoadCallback() {
+            @Override
+            public void onFontsLoaded(List<File> fonts) {
+                runOnUiThread(() -> {
+                    progress.dismiss();
+
+                    if (fonts.isEmpty()) {
+                        Toast.makeText(MainActivity.this, R.string.toast_no_fonts,
+                            Toast.LENGTH_SHORT).show();
+                    }
+
+                    displayFontDialog(fonts);
+                });
+            }
+
+            @Override
+            public void onError(Exception e) {
+                runOnUiThread(() -> {
+                    progress.dismiss();
+                    Toast.makeText(MainActivity.this, R.string.toast_error_fonts,
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
     }
     
     /**
@@ -472,191 +466,76 @@ public class MainActivity extends AppCompatActivity {
     private void displayFontDialog(List<File> fontFiles) {
         List<String> fontNames = new ArrayList<>();
         List<String> fontPaths = new ArrayList<>();
-        
+
         // Add system default option
-        fontNames.add("System Default");
+        fontNames.add(getString(R.string.font_system_default));
         fontPaths.add(null);
-        
+
         // Add system fonts
         for (File font : fontFiles) {
             fontNames.add(font.getName().replace(".ttf", "").replace(".otf", ""));
             fontPaths.add(font.getAbsolutePath());
         }
-        
+
         String[] fontArray = fontNames.toArray(new String[0]);
         int currentSelection = 0;
-        
+
         // Find current selection
-        String currentPath = viewModel.getCurrentFontPath().getValue();
         for (int i = 0; i < fontPaths.size(); i++) {
-            if ((currentPath == null && fontPaths.get(i) == null) ||
-                (currentPath != null && currentPath.equals(fontPaths.get(i)))) {
+            if ((cachedFontPath == null && fontPaths.get(i) == null) ||
+                (cachedFontPath != null && cachedFontPath.equals(fontPaths.get(i)))) {
                 currentSelection = i;
                 break;
             }
         }
-        
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Select Font");
+        builder.setTitle(R.string.dialog_title_font);
         builder.setSingleChoiceItems(fontArray, currentSelection, (dialog, which) -> {
             String selectedPath = fontPaths.get(which);
             String selectedName = fontNames.get(which);
-            
+
+            cachedFontPath = selectedPath;
             viewModel.setCurrentFontPath(selectedPath);
             viewModel.setCurrentFontName(selectedName);
             applyFont(selectedPath);
             preferencesRepo.saveFontPreference(selectedPath, selectedName);
-            
+
             dialog.dismiss();
         });
-        builder.setNegativeButton("Cancel", null);
+        builder.setNegativeButton(R.string.button_cancel, null);
         builder.show();
     }
     
     /**
-     * Scans system font directories for available fonts.
-     * This operation performs file I/O and should be called from a background thread.
-     * 
-     * @return List of font files found on the device
-     */
-    private List<File> getSystemFonts() {
-        List<File> fontFiles = new ArrayList<>();
-        
-        // Common Android font directories
-        String[] fontDirs = {
-            "/system/fonts",
-            "/system/font",
-            "/data/fonts"
-        };
-        
-        for (String dirPath : fontDirs) {
-            File dir = new File(dirPath);
-            if (dir.exists() && dir.isDirectory()) {
-                File[] files = dir.listFiles((d, name) -> 
-                    name.toLowerCase().endsWith(".ttf") || 
-                    name.toLowerCase().endsWith(".otf"));
-                
-                if (files != null) {
-                    // Filter to common, readable font names
-                    // Exclude emoji fonts, symbol fonts, and style variants
-                    for (File file : files) {
-                        String name = file.getName().toLowerCase();
-                        if (!name.contains("emoji") && 
-                            !name.contains("symbol") && 
-                            !name.contains("dingbat") &&
-                            !name.contains("bold") &&
-                            !name.contains("italic") &&
-                            !name.contains("medium") &&
-                            !name.contains("light") &&
-                            !name.contains("thin") &&
-                            !name.contains("black")) {
-                            fontFiles.add(file);
-                        }
-                    }
-                }
-            }
-        }
-        
-        return fontFiles;
-    }
-    
-    /**
      * Applies the selected theme to the UI.
-     * 
+     * Uses ThemeManager for theme application.
+     *
      * @param theme Theme name ("light", "dark", or "sepia")
      */
     private void applyTheme(String theme) {
-        ThemeColors colors = getThemeColors(theme);
-        
-        // Apply colors to views
-        rootView.setBackgroundColor(colors.background);
-        titleText.setTextColor(colors.text);
-        charCounter.setTextColor(colors.textSecondary);
-        limitLabel.setTextColor(colors.textSecondary);
-        editText.setTextColor(colors.text);
-        editText.setHintTextColor(colors.textSecondary);
-        
-        // HIGH PRIORITY FIX: Reuse drawable instead of creating new one each time
-        if (editTextDrawable == null) {
-            editTextDrawable = new GradientDrawable();
-            editTextDrawable.setCornerRadius(8f);
-        }
-        editTextDrawable.setColor(colors.editBackground);
-        editTextDrawable.setStroke(2, colors.textSecondary);
-        editText.setBackground(editTextDrawable);
-    }
-    
-    /**
-     * Gets theme colors for the specified theme.
-     * 
-     * @param theme Theme name
-     * @return ThemeColors object with color values
-     */
-    private ThemeColors getThemeColors(String theme) {
-        switch (theme) {
-            case "dark":
-                return new ThemeColors(
-                    0xFF121212, // background
-                    0xFFFFFFFF, // text
-                    0xFFB0B0B0, // text secondary
-                    0xFF1E1E1E  // edit background
-                );
-            case "sepia":
-                return new ThemeColors(
-                    0xFFF4ECD8, // background
-                    0xFF3E2723, // text
-                    0xFF6D4C41, // text secondary
-                    0xFFEDE0C8  // edit background
-                );
-            default: // light
-                return new ThemeColors(
-                    0xFFFFFFFF, // background
-                    0xFF000000, // text
-                    0xFF666666, // text secondary
-                    0xFFF5F5F5  // edit background
-                );
-        }
+        themeManager.applyTheme(theme, rootView, titleText, charCounter, limitLabel, editText);
     }
     
     /**
      * Applies the selected font to text views.
-     * HIGH PRIORITY FIX: Caches Typeface objects to avoid reloading from disk.
-     * 
+     * Uses FontManager for font loading and caching.
+     *
      * @param fontPath Path to font file, or null for system default
      */
     private void applyFont(String fontPath) {
-        Typeface typeface;
-        
-        if (fontPath == null) {
-            typeface = Typeface.DEFAULT;
-        } else {
-            // HIGH PRIORITY FIX: Check cache first to avoid disk I/O
-            typeface = typefaceCache.get(fontPath);
-            
-            if (typeface == null) {
-                try {
-                    typeface = Typeface.createFromFile(fontPath);
-                    typefaceCache.put(fontPath, typeface);
-                } catch (RuntimeException e) {
-                    Log.e(TAG, "Failed to load font: " + fontPath, e);
-                    Toast.makeText(this, "Could not load font. Using default.", 
-                        Toast.LENGTH_SHORT).show();
-                    typeface = Typeface.DEFAULT;
-                    viewModel.setCurrentFontPath(null);
-                    viewModel.setCurrentFontName("System Default");
-                    preferencesRepo.saveFontPreference(null, "System Default");
-                } catch (OutOfMemoryError e) {
-                    Log.e(TAG, "Font file too large: " + fontPath, e);
-                    Toast.makeText(this, "Font file is too large. Using default.", 
-                        Toast.LENGTH_SHORT).show();
-                    typeface = Typeface.DEFAULT;
-                    viewModel.setCurrentFontPath(null);
-                    viewModel.setCurrentFontName("System Default");
-                    preferencesRepo.saveFontPreference(null, "System Default");
-                }
-            }
+        Typeface typeface = fontManager.loadTypeface(fontPath);
+
+        // If font loading failed and we expected a custom font, reset to default
+        if (typeface == Typeface.DEFAULT && fontPath != null) {
+            Toast.makeText(this, R.string.toast_font_error, Toast.LENGTH_SHORT).show();
+            String systemDefault = getString(R.string.font_system_default);
+            cachedFontPath = null;
+            viewModel.setCurrentFontPath(null);
+            viewModel.setCurrentFontName(systemDefault);
+            preferencesRepo.saveFontPreference(null, systemDefault);
         }
-        
+
         // Apply typeface to all text views
         editText.setTypeface(typeface);
         titleText.setTypeface(typeface);
@@ -671,9 +550,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private void showErrorDialog(String message) {
         new AlertDialog.Builder(this)
-            .setTitle("Invalid Input")
+            .setTitle(R.string.dialog_title_error)
             .setMessage(message)
-            .setPositiveButton("OK", null)
+            .setPositiveButton(R.string.button_ok, null)
             .show();
     }
 
@@ -685,7 +564,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putString("current_text", editText.getText().toString());
-        outState.putInt("max_chars", viewModel.getMaxCharacters().getValue());
+        Integer maxChars = viewModel.getMaxCharacters().getValue();
+        if (maxChars != null) {
+            outState.putInt("max_chars", maxChars);
+        }
         outState.putString("theme", viewModel.getCurrentTheme().getValue());
         outState.putString("font_path", viewModel.getCurrentFontPath().getValue());
         outState.putString("font_name", viewModel.getCurrentFontName().getValue());
@@ -716,15 +598,33 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        
+
         // Remove TextWatcher to prevent memory leaks
         if (editText != null && textWatcher != null) {
             editText.removeTextChangedListener(textWatcher);
         }
-        
+
         // Cancel any pending saves
         if (saveHandler != null && saveRunnable != null) {
             saveHandler.removeCallbacks(saveRunnable);
+        }
+
+        // Clear font manager cache to free memory
+        if (fontManager != null) {
+            fontManager.clearCache();
+        }
+
+        // Shutdown executor
+        if (backgroundExecutor != null) {
+            backgroundExecutor.shutdown();
+            try {
+                if (!backgroundExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
+                    backgroundExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                backgroundExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }
