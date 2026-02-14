@@ -21,6 +21,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 import com.google.android.material.button.MaterialButton;
+import android.content.Intent;
 import android.view.View;
 import java.io.File;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton themeButton;
     private MaterialButton fontButton;
     private MaterialButton fontSizeButton;
+    private MaterialButton aboutButton;
     private View rootView;
     
     // ViewModel for configuration change handling
@@ -143,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
         themeButton = findViewById(R.id.themeButton);
         fontButton = findViewById(R.id.fontButton);
         fontSizeButton = findViewById(R.id.fontSizeButton);
+        aboutButton = findViewById(R.id.aboutButton);
         rootView = findViewById(android.R.id.content);
 
         // Set content descriptions for accessibility
@@ -254,6 +257,11 @@ public class MainActivity extends AppCompatActivity {
         themeButton.setOnClickListener(v -> showThemeDialog());
         fontButton.setOnClickListener(v -> showFontDialog());
         fontSizeButton.setOnClickListener(v -> showFontSizeDialog());
+        aboutButton.setOnClickListener(v -> {
+            Intent intent = new Intent(this, AboutActivity.class);
+            intent.putExtra("theme", cachedTheme);
+            startActivity(intent);
+        });
     }
 
     /**
