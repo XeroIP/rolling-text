@@ -95,7 +95,6 @@ lint/tmp/
 
 # Windows special files
 nul
-release-key
 
 # .idea directory (IDE-specific)
 .idea/
@@ -105,6 +104,9 @@ release-key
 
 # Release keys
 release-key/
+release-key
 *.jks
 *.keystore
 
+# Temporary commit message files
+commit-message.txt

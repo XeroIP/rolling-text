@@ -7,14 +7,20 @@ import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
+import com.google.android.material.button.MaterialButton;
 import android.view.View;
 import java.io.File;
 import java.util.ArrayList;
@@ -43,11 +49,10 @@ public class MainActivity extends AppCompatActivity {
     // UI Components
     private EditText editText;
     private TextView charCounter;
-    private TextView titleText;
-    private TextView limitLabel;
-    private Button settingsButton;
-    private Button themeButton;
-    private Button fontButton;
+    private MaterialButton settingsButton;
+    private MaterialButton themeButton;
+    private MaterialButton fontButton;
+    private MaterialButton fontSizeButton;
     private View rootView;
     
     // ViewModel for configuration change handling
@@ -77,9 +82,10 @@ public class MainActivity extends AppCompatActivity {
     private ThemeManager themeManager;
 
     // Cached LiveData values to avoid null checks
-    private int cachedMaxCharacters = 255;
+    private int cachedMaxCharacters = 128;
     private String cachedTheme = "light";
     private String cachedFontPath = null;
+    private float cachedFontSize = 16f;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -133,17 +139,17 @@ public class MainActivity extends AppCompatActivity {
     private void initializeViews() {
         editText = findViewById(R.id.editText);
         charCounter = findViewById(R.id.charCounter);
-        titleText = findViewById(R.id.titleText);
-        limitLabel = findViewById(R.id.limitLabel);
         settingsButton = findViewById(R.id.settingsButton);
         themeButton = findViewById(R.id.themeButton);
         fontButton = findViewById(R.id.fontButton);
+        fontSizeButton = findViewById(R.id.fontSizeButton);
         rootView = findViewById(android.R.id.content);
-        
+
         // Set content descriptions for accessibility
         settingsButton.setContentDescription(getString(R.string.desc_change_limit));
         fontButton.setContentDescription(getString(R.string.desc_choose_font));
-        
+        fontSizeButton.setContentDescription(getString(R.string.desc_change_font_size));
+
         // Make character counter less chatty for screen readers
         charCounter.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
@@ -155,7 +161,7 @@ public class MainActivity extends AppCompatActivity {
     private void loadState(Bundle savedInstanceState) {
         if (savedInstanceState != null) {
             // Restore from savedInstanceState (most recent state)
-            viewModel.setMaxCharacters(savedInstanceState.getInt("max_chars", 255));
+            viewModel.setMaxCharacters(savedInstanceState.getInt("max_chars", 128));
             viewModel.setCurrentTheme(savedInstanceState.getString("theme", "light"));
             viewModel.setCurrentFontPath(savedInstanceState.getString("font_path", null));
             viewModel.setCurrentFontName(savedInstanceState.getString("font_name", getString(R.string.font_system_default)));
@@ -173,6 +179,7 @@ public class MainActivity extends AppCompatActivity {
                 String fontPath = preferencesRepo.getFontPath();
                 String fontName = preferencesRepo.getFontName();
                 String savedText = preferencesRepo.getText();
+                float fontSize = preferencesRepo.getFontSize();
 
                 viewModel.setMaxCharacters(maxChars);
                 viewModel.setCurrentTheme(theme);
@@ -181,6 +188,9 @@ public class MainActivity extends AppCompatActivity {
                 viewModel.setText(savedText);
 
                 editText.setText(savedText);
+                editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, fontSize);
+                cachedFontSize = fontSize;
+
                 if (savedText != null && !savedText.isEmpty()) {
                     editText.setSelection(savedText.length());
                 }
@@ -189,7 +199,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Cache LiveData values for performance and null-safety
         cachedMaxCharacters = viewModel.getMaxCharacters().getValue() != null ?
-            viewModel.getMaxCharacters().getValue() : 255;
+            viewModel.getMaxCharacters().getValue() : 128;
         cachedTheme = viewModel.getCurrentTheme().getValue() != null ?
             viewModel.getCurrentTheme().getValue() : "light";
         cachedFontPath = viewModel.getCurrentFontPath().getValue();
@@ -243,6 +253,7 @@ public class MainActivity extends AppCompatActivity {
         settingsButton.setOnClickListener(v -> showLimitDialog());
         themeButton.setOnClickListener(v -> showThemeDialog());
         fontButton.setOnClickListener(v -> showFontDialog());
+        fontSizeButton.setOnClickListener(v -> showFontSizeDialog());
     }
 
     /**
@@ -321,20 +332,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows dialog to change the character limit.
+     * Shows dialog to change the character limit and auto-save settings.
      * Warns user if the new limit would truncate existing text.
      */
     private void showLimitDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.dialog_title_limit);
 
+        // Create a layout to hold both EditText and CheckBox
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(60, 20, 60, 20);
+
         final EditText input = new EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        input.setHint("Character limit");
         input.setText(String.valueOf(cachedMaxCharacters));
         input.setSelection(input.getText().length());
-        builder.setView(input);
+        layout.addView(input);
+
+        final CheckBox autoSaveCheckbox = new CheckBox(this);
+        autoSaveCheckbox.setText("Save text when closing app");
+        autoSaveCheckbox.setChecked(preferencesRepo.getAutoSaveText());
+        layout.addView(autoSaveCheckbox);
+
+        builder.setView(layout);
 
         builder.setPositiveButton(getString(R.string.button_ok), (dialog, which) -> {
+            // Save auto-save preference
+            preferencesRepo.setAutoSaveText(autoSaveCheckbox.isChecked());
+
             String inputText = input.getText().toString();
             if (!inputText.isEmpty()) {
                 try {
@@ -343,8 +370,8 @@ public class MainActivity extends AppCompatActivity {
                         int currentLength = Character.codePointCount(
                             editText.getText(), 0, editText.getText().length()
                         );
-                        
-                        // HIGH PRIORITY FIX: Warn if text will be truncated
+
+                        // Warn if text will be truncated
                         if (newLimit < currentLength) {
                             int charsToRemove = currentLength - newLimit;
                             new AlertDialog.Builder(this)
@@ -366,7 +393,11 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        builder.setNegativeButton(getString(R.string.button_cancel), (dialog, which) -> dialog.cancel());
+        builder.setNegativeButton(getString(R.string.button_cancel), (dialog, which) -> {
+            // Still save the checkbox state even if cancelled
+            preferencesRepo.setAutoSaveText(autoSaveCheckbox.isChecked());
+            dialog.cancel();
+        });
         builder.show();
     }
 
@@ -459,8 +490,8 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
-     * Displays the font selection dialog.
-     * 
+     * Displays the font selection dialog with fonts shown in their own typeface.
+     *
      * @param fontFiles List of available font files
      */
     private void displayFontDialog(List<File> fontFiles) {
@@ -477,7 +508,6 @@ public class MainActivity extends AppCompatActivity {
             fontPaths.add(font.getAbsolutePath());
         }
 
-        String[] fontArray = fontNames.toArray(new String[0]);
         int currentSelection = 0;
 
         // Find current selection
@@ -489,9 +519,32 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // Create custom adapter to display fonts in their own typeface
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.select_dialog_singlechoice, fontNames) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                TextView textView = view.findViewById(android.R.id.text1);
+
+                // Apply the font's own typeface to the text
+                String fontPath = fontPaths.get(position);
+                if (fontPath != null) {
+                    try {
+                        Typeface typeface = fontManager.loadTypeface(fontPath);
+                        textView.setTypeface(typeface);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Could not load font for preview: " + fontPath);
+                    }
+                }
+
+                return view;
+            }
+        };
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.dialog_title_font);
-        builder.setSingleChoiceItems(fontArray, currentSelection, (dialog, which) -> {
+        builder.setSingleChoiceItems(adapter, currentSelection, (dialog, which) -> {
             String selectedPath = fontPaths.get(which);
             String selectedName = fontNames.get(which);
 
@@ -514,38 +567,115 @@ public class MainActivity extends AppCompatActivity {
      * @param theme Theme name ("light", "dark", or "sepia")
      */
     private void applyTheme(String theme) {
-        themeManager.applyTheme(theme, rootView, titleText, charCounter, limitLabel, editText);
+        themeManager.applyTheme(theme, rootView, null, charCounter, null, editText);
     }
     
     /**
      * Applies the selected font to text views.
      * Uses FontManager for font loading and caching.
      *
-     * @param fontPath Path to font file, or null for system default
+     * @param fontPath Path to font file, or null for system default (serif monospace)
      */
     private void applyFont(String fontPath) {
-        Typeface typeface = fontManager.loadTypeface(fontPath);
+        Typeface typeface;
 
-        // If font loading failed and we expected a custom font, reset to default
-        if (typeface == Typeface.DEFAULT && fontPath != null) {
-            Toast.makeText(this, R.string.toast_font_error, Toast.LENGTH_SHORT).show();
-            String systemDefault = getString(R.string.font_system_default);
-            cachedFontPath = null;
-            viewModel.setCurrentFontPath(null);
-            viewModel.setCurrentFontName(systemDefault);
-            preferencesRepo.saveFontPreference(null, systemDefault);
+        if (fontPath == null) {
+            // Use serif monospace as default
+            typeface = Typeface.create("serif-monospace", Typeface.NORMAL);
+        } else {
+            typeface = fontManager.loadTypeface(fontPath);
+
+            // If font loading failed, reset to default
+            if (typeface == Typeface.DEFAULT) {
+                Toast.makeText(this, R.string.toast_font_error, Toast.LENGTH_SHORT).show();
+                String systemDefault = getString(R.string.font_system_default);
+                cachedFontPath = null;
+                viewModel.setCurrentFontPath(null);
+                viewModel.setCurrentFontName(systemDefault);
+                preferencesRepo.saveFontPreference(null, systemDefault);
+                typeface = Typeface.create("serif-monospace", Typeface.NORMAL);
+            }
         }
 
         // Apply typeface to all text views
         editText.setTypeface(typeface);
-        titleText.setTypeface(typeface);
         charCounter.setTypeface(typeface);
-        limitLabel.setTypeface(typeface);
+    }
+
+    /**
+     * Shows dialog to change font size with list and custom input.
+     */
+    private void showFontSizeDialog() {
+        String[] sizes = {"10pt", "12pt", "14pt", "16pt", "18pt", "20pt", "24pt", "28pt", "32pt", "Custom..."};
+        int[] sizeValues = {10, 12, 14, 16, 18, 20, 24, 28, 32};
+
+        int currentSelection = 3; // Default to 16pt
+        for (int i = 0; i < sizeValues.length; i++) {
+            if (sizeValues[i] == (int)cachedFontSize) {
+                currentSelection = i;
+                break;
+            }
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.dialog_title_font_size);
+        builder.setSingleChoiceItems(sizes, currentSelection, (dialog, which) -> {
+            if (which == sizes.length - 1) {
+                // Custom option selected
+                dialog.dismiss();
+                showCustomFontSizeDialog();
+            } else {
+                float newSize = sizeValues[which];
+                cachedFontSize = newSize;
+                editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, newSize);
+                preferencesRepo.saveFontSize(newSize);
+                dialog.dismiss();
+            }
+        });
+        builder.setNegativeButton(R.string.button_cancel, null);
+        builder.show();
+    }
+
+    /**
+     * Shows dialog for custom font size input.
+     */
+    private void showCustomFontSizeDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.dialog_title_font_size);
+
+        final EditText input = new EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        input.setHint("Enter size in pt (6-72)");
+        input.setText(String.valueOf((int)cachedFontSize));
+        input.setSelection(input.getText().length());
+        builder.setView(input);
+
+        builder.setPositiveButton(getString(R.string.button_ok), (dialog, which) -> {
+            String inputText = input.getText().toString();
+            if (!inputText.isEmpty()) {
+                try {
+                    int newSize = Integer.parseInt(inputText);
+                    if (newSize >= 6 && newSize <= 72) {
+                        cachedFontSize = newSize;
+                        editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, newSize);
+                        preferencesRepo.saveFontSize(newSize);
+                    } else {
+                        showErrorDialog("Please enter a size between 6 and 72 pt");
+                    }
+                } catch (NumberFormatException e) {
+                    showErrorDialog(getString(R.string.error_invalid_number));
+                    Log.e(TAG, "Invalid number format", e);
+                }
+            }
+        });
+
+        builder.setNegativeButton(getString(R.string.button_cancel), null);
+        builder.show();
     }
 
     /**
      * Shows an error dialog with the specified message.
-     * 
+     *
      * @param message Error message to display
      */
     private void showErrorDialog(String message) {
@@ -574,21 +704,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Save text immediately when app goes to background.
+     * Save text immediately when app goes to background (if auto-save is enabled).
      * Cancels any pending debounced save and saves immediately.
      */
     @Override
     protected void onPause() {
         super.onPause();
-        
-        // Cancel pending save and save immediately
+
+        // Cancel pending save
         if (saveRunnable != null) {
             saveHandler.removeCallbacks(saveRunnable);
         }
-        
-        String currentText = editText.getText().toString();
-        viewModel.setText(currentText);
-        preferencesRepo.saveText(currentText);
+
+        // Only save if auto-save is enabled
+        if (preferencesRepo.getAutoSaveText()) {
+            String currentText = editText.getText().toString();
+            viewModel.setText(currentText);
+            preferencesRepo.saveText(currentText);
+        }
     }
 
     /**

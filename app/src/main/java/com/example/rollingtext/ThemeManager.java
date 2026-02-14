@@ -49,10 +49,10 @@ public class ThemeManager {
                 );
             case "sepia":
                 return new ThemeColors(
-                    0xFFF4ECD8, // background
-                    0xFF3E2723, // text
-                    0xFF6D4C41, // text secondary
-                    0xFFEDE0C8  // edit background
+                    0xFFE8D5B8, // background - more intense
+                    0xFF2C1810, // text - darker
+                    0xFF5D4037, // text secondary - more intense
+                    0xFFD4BC98  // edit background - more intense
                 );
             default: // light
                 return new ThemeColors(
@@ -69,9 +69,9 @@ public class ThemeManager {
      *
      * @param theme Theme name ("light", "dark", or "sepia")
      * @param rootView Root view for background
-     * @param titleText Title text view
+     * @param titleText Title text view (can be null)
      * @param charCounter Character counter text view
-     * @param limitLabel Limit label text view
+     * @param limitLabel Limit label text view (can be null)
      * @param editText Edit text view
      */
     public void applyTheme(String theme, View rootView, TextView titleText,
@@ -80,19 +80,22 @@ public class ThemeManager {
 
         // Apply colors to views
         rootView.setBackgroundColor(colors.background);
-        titleText.setTextColor(colors.text);
-        charCounter.setTextColor(colors.textSecondary);
-        limitLabel.setTextColor(colors.textSecondary);
+
+        // Only apply to views that exist
+        if (titleText != null) {
+            titleText.setTextColor(colors.text);
+        }
+        if (charCounter != null) {
+            charCounter.setTextColor(colors.textSecondary);
+        }
+        if (limitLabel != null) {
+            limitLabel.setTextColor(colors.textSecondary);
+        }
+
         editText.setTextColor(colors.text);
         editText.setHintTextColor(colors.textSecondary);
 
-        // Reuse drawable instead of creating new one each time
-        if (editTextDrawable == null) {
-            editTextDrawable = new GradientDrawable();
-            editTextDrawable.setCornerRadius(8f);
-        }
-        editTextDrawable.setColor(colors.editBackground);
-        editTextDrawable.setStroke(2, colors.textSecondary);
-        editText.setBackground(editTextDrawable);
+        // Don't set background - using Material 3 transparent background
+        // The EditText has android:background="@null" for borderless design
     }
 }

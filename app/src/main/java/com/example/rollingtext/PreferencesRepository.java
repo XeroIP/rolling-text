@@ -26,6 +26,8 @@ public class PreferencesRepository {
     private static final String KEY_THEME = "theme";
     private static final String KEY_FONT_PATH = "fontPath";
     private static final String KEY_FONT_NAME = "fontName";
+    private static final String KEY_FONT_SIZE = "fontSize";
+    private static final String KEY_AUTO_SAVE = "autoSaveText";
     
     // Maximum safe size for SharedPreferences (500KB)
     private static final int MAX_TEXT_SIZE = 500000;
@@ -86,11 +88,11 @@ public class PreferencesRepository {
     
     /**
      * Get saved maximum character limit.
-     * 
-     * @return Saved limit, or 255 (default) if none exists
+     *
+     * @return Saved limit, or 128 (default) if none exists
      */
     public int getMaxCharacters() {
-        return prefs.getInt(KEY_MAX_CHARS, 255);
+        return prefs.getInt(KEY_MAX_CHARS, 128);
     }
     
     /**
@@ -137,13 +139,53 @@ public class PreferencesRepository {
     
     /**
      * Get saved font name.
-     * 
+     *
      * @return Saved font name, or "System Default" if none exists
      */
     public String getFontName() {
         return prefs.getString(KEY_FONT_NAME, "System Default");
     }
-    
+
+    /**
+     * Save font size preference.
+     *
+     * @param fontSize Font size in sp
+     */
+    public void saveFontSize(float fontSize) {
+        prefs.edit()
+            .putFloat(KEY_FONT_SIZE, fontSize)
+            .apply();
+    }
+
+    /**
+     * Get saved font size.
+     *
+     * @return Saved font size, or 16 (default) if none exists
+     */
+    public float getFontSize() {
+        return prefs.getFloat(KEY_FONT_SIZE, 16f);
+    }
+
+    /**
+     * Save auto-save text preference.
+     *
+     * @param autoSave Whether to auto-save text on exit
+     */
+    public void setAutoSaveText(boolean autoSave) {
+        prefs.edit()
+            .putBoolean(KEY_AUTO_SAVE, autoSave)
+            .apply();
+    }
+
+    /**
+     * Get auto-save text preference.
+     *
+     * @return True if auto-save is enabled (default), false otherwise
+     */
+    public boolean getAutoSaveText() {
+        return prefs.getBoolean(KEY_AUTO_SAVE, true);
+    }
+
     /**
      * Clear all saved preferences.
      * Useful for a "Reset to Defaults" feature.
