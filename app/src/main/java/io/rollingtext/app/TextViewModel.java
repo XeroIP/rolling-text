@@ -1,4 +1,4 @@
-package com.example.rollingtext;
+package io.rollingtext.app;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
@@ -31,6 +31,18 @@ public class TextViewModel extends ViewModel {
 
     // Current font size in pt
     private final MutableLiveData<Float> fontSize = new MutableLiveData<>(16f);
+
+    // Whether the ViewModel has been initialized with preferences data.
+    // Plain boolean (not LiveData) — only checked in loadState() on the main thread.
+    private boolean initialized = false;
+
+    public boolean isInitialized() {
+        return initialized;
+    }
+
+    public void setInitialized(boolean value) {
+        initialized = value;
+    }
 
     // Getters for LiveData (read-only access)
     

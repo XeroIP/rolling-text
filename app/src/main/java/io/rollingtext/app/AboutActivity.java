@@ -1,9 +1,13 @@
-package com.example.rollingtext;
+package io.rollingtext.app;
 
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.view.View;
+import android.view.Window;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.google.android.material.button.MaterialButton;
 
 /**
@@ -70,6 +74,13 @@ public class AboutActivity extends AppCompatActivity {
         // Style the back button to match the theme
         MaterialButton backButton = findViewById(R.id.backButton);
         backButton.setTextColor(colors.textSecondary);
-        backButton.setIconTint(android.content.res.ColorStateList.valueOf(colors.textSecondary));
+        backButton.setIconTint(ColorStateList.valueOf(colors.textSecondary));
+        backButton.setBackgroundTintList(ColorStateList.valueOf(colors.buttonBackground));
+
+        // Status bar: dark icons for light/sepia backgrounds, light icons for dark
+        Window window = getWindow();
+        WindowInsetsControllerCompat insetsController =
+            WindowCompat.getInsetsController(window, window.getDecorView());
+        insetsController.setAppearanceLightStatusBars(!theme.equals("dark"));
     }
 }

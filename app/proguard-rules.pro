@@ -15,16 +15,16 @@
 -keep class androidx.lifecycle.MutableLiveData { *; }
 
 # Keep our ViewModel implementation
--keep class com.example.rollingtext.TextViewModel { *; }
+-keep class io.rollingtext.app.TextViewModel { *; }
 
 # Keep PreferencesRepository (may use reflection for SharedPreferences)
--keep class com.example.rollingtext.PreferencesRepository {
+-keep class io.rollingtext.app.PreferencesRepository {
     <init>(...);
     public *;
 }
 
 # Keep MainActivity (entry point)
--keep class com.example.rollingtext.MainActivity {
+-keep class io.rollingtext.app.MainActivity {
     <init>(...);
 }
 

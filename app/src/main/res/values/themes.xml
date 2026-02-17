@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Material 3 Expressive Base Theme -->
-    <style name="Base.Theme.RollingText" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Base.Theme.RollingText" parent="Theme.Material3.Light.NoActionBar">
         <!-- Primary brand color -->
         <item name="colorPrimary">@color/md_theme_primary</item>
         <item name="colorOnPrimary">@color/md_theme_on_primary</item>
@@ -41,9 +41,8 @@
         <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Material3.Corner.ExtraLarge</item>
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Material3.Corner.ExtraLarge</item>
 
-        <!-- Status bar -->
+        <!-- Status bar (icon appearance controlled programmatically by ThemeManager) -->
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
     </style>
 
     <style name="Theme.RollingText" parent="Base.Theme.RollingText" />

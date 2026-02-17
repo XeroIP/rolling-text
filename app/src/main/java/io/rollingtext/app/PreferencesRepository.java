@@ -1,4 +1,4 @@
-package com.example.rollingtext;
+package io.rollingtext.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;

@@ -1,4 +1,4 @@
-package com.example.rollingtext;
+package io.rollingtext.app;
 
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -166,16 +166,18 @@ public class MainActivity extends AppCompatActivity {
             viewModel.setText(savedText);
             editText.setText(savedText);
             editText.setSelection(savedText.length());
+            viewModel.setInitialized(true);
         } else {
-            String text = viewModel.getText().getValue();
-            if (text == null || text.isEmpty()) {
-                // First time initialization - load from SharedPreferences
+            if (!viewModel.isInitialized()) {
+                // First launch — load user preferences from SharedPreferences
                 viewModel.setMaxCharacters(preferencesRepo.getMaxCharacters());
                 viewModel.setCurrentTheme(preferencesRepo.getTheme());
                 viewModel.setCurrentFontPath(preferencesRepo.getFontPath());
                 viewModel.setCurrentFontName(preferencesRepo.getFontName());
                 viewModel.setFontSize(preferencesRepo.getFontSize());
+                viewModel.setInitialized(true);
             }
+            // else: configuration change (e.g., rotation) — ViewModel already holds correct state
         }
 
         // Cache LiveData values for performance and null-safety
@@ -530,7 +532,8 @@ public class MainActivity extends AppCompatActivity {
      * @param theme Theme name ("light", "dark", or "sepia")
      */
     private void applyTheme(String theme) {
-        themeManager.applyTheme(theme, this, rootView, charCounter, editText);
+        themeManager.applyTheme(theme, this, rootView, charCounter, editText,
+            settingsButton, themeButton, fontButton, fontSizeButton, aboutButton);
     }
     
     /**

@@ -37,14 +37,20 @@
     <color name="light_background">#FFFFFF</color>
     <color name="light_text">#000000</color>
     <color name="light_text_secondary">#666666</color>
+    <color name="light_button_background">#E8DEF8</color>
+    <color name="light_button_icon">#1D192B</color>
 
     <!-- Dark Theme -->
     <color name="dark_background">#121212</color>
     <color name="dark_text">#FFFFFF</color>
     <color name="dark_text_secondary">#B0B0B0</color>
+    <color name="dark_button_background">#2C2C2C</color>
+    <color name="dark_button_icon">#E0E0E0</color>
 
     <!-- Sepia Theme -->
     <color name="sepia_background">#E8D5B8</color>
     <color name="sepia_text">#2C1810</color>
-    <color name="sepia_text_secondary">#5D4037</color>
+    <color name="sepia_text_secondary">#4E342E</color>
+    <color name="sepia_button_background">#C9AD88</color>
+    <color name="sepia_button_icon">#2C1810</color>
 </resources>
