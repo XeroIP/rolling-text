@@ -31,7 +31,7 @@ public class AboutActivity extends AppCompatActivity {
 
     private void applyTheme(String theme) {
         ThemeManager themeManager = new ThemeManager();
-        ThemeManager.ThemeColors colors = themeManager.getThemeColors(theme);
+        ThemeManager.ThemeColors colors = themeManager.getThemeColors(theme, this);
 
         View scrollView = findViewById(R.id.aboutScrollView);
         View content = findViewById(R.id.aboutContent);

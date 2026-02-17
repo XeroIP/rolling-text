@@ -5,6 +5,61 @@ All notable changes to the RollingText Android app will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-02-13
+
+### Code Quality & Correctness Release
+
+This release removes text persistence (the app now always starts with a blank editor, true to its philosophy), and implements all findings from a comprehensive code review focused on correctness, security, and code quality.
+
+### Removed
+- **Auto-save text persistence** - The app no longer saves or restores typed text between sessions
+  - Removed auto-save checkbox from settings dialog
+  - Removed `saveText()`, `getText()`, `setAutoSaveText()`, `getAutoSaveText()` from PreferencesRepository
+  - Removed `onPause` text saving and startup text loading
+  - User settings (theme, font, font size, character limit) are still persisted
+- **`configChanges` from AndroidManifest** - Removed `android:configChanges="orientation|screenSize|keyboardHidden"` from MainActivity to let the ViewModel handle configuration changes properly (the modern Android standard)
+- **Unused code cleanup**:
+  - Removed unused `Context` field and constructor parameter from `FontManager` (eliminated Activity reference memory leak risk)
+  - Removed unused imports from MainActivity (`LayoutInflater`, `Button`, `CheckBox`, `LinearLayout`)
+  - Removed empty `onCleared()` override from `TextViewModel`
+  - Removed unused `clearAll()` method from `PreferencesRepository`
+  - Removed unused `TAG` constant and `Log` import from `PreferencesRepository`
+  - Removed unused `editTextDrawable` field and `GradientDrawable` import from `ThemeManager`
+  - Removed unused `editBackground` field from `ThemeManager.ThemeColors`
+  - Removed always-null `titleText` and `limitLabel` parameters from `ThemeManager.applyTheme()`
+  - Removed 3 unused `*_edit_background` color resources from `colors.xml`
+
+### Fixed
+- **Thread safety** - Added `volatile` to `cachedFonts` field in `FontManager` to fix data race between main and background threads
+- **Default character limit mismatch** - `TextViewModel` defaulted to 255 characters while `PreferencesRepository` defaulted to 128; introduced `PreferencesRepository.DEFAULT_MAX_CHARS` constant as single source of truth
+- **Font size not surviving configuration changes** - Added `fontSize` LiveData to `TextViewModel` and `onSaveInstanceState` so font size persists across screen rotation and process death
+- **Stale comments** - Fixed comment claiming "prevent excessive I/O" when no I/O occurs (now "prevent excessive ViewModel sync")
+- **Incorrect emoji comment** - Fixed claim that family emoji is 1 code point (it's actually 7 code points joined by ZWJ characters)
+- **Javadoc error** - Fixed `saveFontSize` documentation saying "sp" when the unit is "pt"
+- **Hardcoded color** - Replaced hardcoded `#666666` on character counter in `activity_main.xml` with `?attr/colorOnSurfaceVariant`
+
+### Changed
+- **ThemeManager refactored to use XML color resources** - Replaced all hardcoded hex color values with `ContextCompat.getColor()` calls resolving from `colors.xml`, eliminating duplication between Java and XML
+- **Hardcoded strings moved to resources** - Moved 3 remaining hardcoded UI strings to `strings.xml`:
+  - `"Character limit"` → `@string/hint_character_limit`
+  - `"Enter size in pt (6-72)"` → `@string/hint_font_size`
+  - `"Please enter a size between 6 and 72 pt"` → `@string/error_font_size_range`
+- **Static content descriptions moved to XML** - Moved content descriptions for `settingsButton`, `fontButton`, and `fontSizeButton` from Java to `activity_main.xml` (only the dynamic theme button description remains in Java)
+- **Simplified font path comparison** - Replaced manual null-check with `Objects.equals()`
+- **`android:allowBackup` set to `false`** - Aligns with the app's "nothing is stored" philosophy
+
+### Security & Build
+- **Enabled ProGuard/R8** - Set `minifyEnabled true` and `shrinkResources true` for release builds (code shrinking, obfuscation, and unused resource removal)
+- **Removed duplicate dependency** - Removed duplicate `appcompat` entry from `build.gradle`
+
+### Technical Details
+- **Files Changed**: 11 (7 Java, 3 XML resources, 1 Gradle)
+- **New String Resources**: 3
+- **Removed Color Resources**: 3
+- **Build Verified**: `assembleDebug` passes successfully
+
+---
+
 ## [2.0.0] - 2026-02-12
 
 ### 🎉 Major Release - Production Ready

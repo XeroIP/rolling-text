@@ -2,7 +2,6 @@ package com.example.rollingtext;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 
 /**
  * Repository class for managing SharedPreferences operations.
@@ -18,19 +17,14 @@ import android.util.Log;
  */
 public class PreferencesRepository {
     
-    private static final String TAG = "PreferencesRepository";
-    
+    public static final int DEFAULT_MAX_CHARS = 128;
+
     private static final String PREFS_NAME = "RollingTextPrefs";
     private static final String KEY_MAX_CHARS = "maxCharacters";
-    private static final String KEY_SAVED_TEXT = "savedText";
     private static final String KEY_THEME = "theme";
     private static final String KEY_FONT_PATH = "fontPath";
     private static final String KEY_FONT_NAME = "fontName";
     private static final String KEY_FONT_SIZE = "fontSize";
-    private static final String KEY_AUTO_SAVE = "autoSaveText";
-    
-    // Maximum safe size for SharedPreferences (500KB)
-    private static final int MAX_TEXT_SIZE = 500000;
     
     private final SharedPreferences prefs;
     
@@ -41,38 +35,6 @@ public class PreferencesRepository {
      */
     public PreferencesRepository(Context context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-    }
-    
-    /**
-     * Save text content to SharedPreferences.
-     * Checks size to prevent exceeding SharedPreferences limits.
-     * 
-     * @param text Text to save
-     */
-    public void saveText(String text) {
-        if (text == null) {
-            text = "";
-        }
-        
-        // Check if text is too large for SharedPreferences
-        if (text.length() > MAX_TEXT_SIZE) {
-            Log.w(TAG, "Text exceeds safe size limit (" + text.length() + " > " + MAX_TEXT_SIZE + ")");
-            // Truncate to safe size
-            text = text.substring(0, MAX_TEXT_SIZE);
-        }
-        
-        prefs.edit()
-            .putString(KEY_SAVED_TEXT, text)
-            .apply();
-    }
-    
-    /**
-     * Get saved text content.
-     * 
-     * @return Saved text, or empty string if none exists
-     */
-    public String getText() {
-        return prefs.getString(KEY_SAVED_TEXT, "");
     }
     
     /**
@@ -92,7 +54,7 @@ public class PreferencesRepository {
      * @return Saved limit, or 128 (default) if none exists
      */
     public int getMaxCharacters() {
-        return prefs.getInt(KEY_MAX_CHARS, 128);
+        return prefs.getInt(KEY_MAX_CHARS, DEFAULT_MAX_CHARS);
     }
     
     /**
@@ -149,7 +111,7 @@ public class PreferencesRepository {
     /**
      * Save font size preference.
      *
-     * @param fontSize Font size in sp
+     * @param fontSize Font size in pt
      */
     public void saveFontSize(float fontSize) {
         prefs.edit()
@@ -164,35 +126,5 @@ public class PreferencesRepository {
      */
     public float getFontSize() {
         return prefs.getFloat(KEY_FONT_SIZE, 16f);
-    }
-
-    /**
-     * Save auto-save text preference.
-     *
-     * @param autoSave Whether to auto-save text on exit
-     */
-    public void setAutoSaveText(boolean autoSave) {
-        prefs.edit()
-            .putBoolean(KEY_AUTO_SAVE, autoSave)
-            .apply();
-    }
-
-    /**
-     * Get auto-save text preference.
-     *
-     * @return True if auto-save is enabled (default), false otherwise
-     */
-    public boolean getAutoSaveText() {
-        return prefs.getBoolean(KEY_AUTO_SAVE, true);
-    }
-
-    /**
-     * Clear all saved preferences.
-     * Useful for a "Reset to Defaults" feature.
-     */
-    public void clearAll() {
-        prefs.edit()
-            .clear()
-            .apply();
     }
 }

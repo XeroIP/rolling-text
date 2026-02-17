@@ -58,9 +58,14 @@
     <string name="toast_font_error">Could not load font. Using default.</string>
     <string name="toast_font_too_large">Font file is too large. Using default.</string>
 
+    <!-- Hints -->
+    <string name="hint_character_limit">Character limit</string>
+    <string name="hint_font_size">Enter size in pt (6–72)</string>
+
     <!-- Error messages -->
     <string name="error_invalid_number">Please enter a valid number</string>
     <string name="error_number_range">Please enter a number between 1 and 1,000,000</string>
+    <string name="error_font_size_range">Please enter a size between 6 and 72 pt</string>
 
     <!-- Accessibility announcements -->
     <string name="announce_theme_changed">Theme changed to %s mode</string>

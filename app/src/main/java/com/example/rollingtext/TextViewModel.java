@@ -18,7 +18,7 @@ public class TextViewModel extends ViewModel {
     private final MutableLiveData<String> text = new MutableLiveData<>("");
     
     // Maximum character limit
-    private final MutableLiveData<Integer> maxCharacters = new MutableLiveData<>(255);
+    private final MutableLiveData<Integer> maxCharacters = new MutableLiveData<>(PreferencesRepository.DEFAULT_MAX_CHARS);
     
     // Current theme ("light", "dark", or "sepia")
     private final MutableLiveData<String> currentTheme = new MutableLiveData<>("light");
@@ -28,7 +28,10 @@ public class TextViewModel extends ViewModel {
     
     // Current font display name
     private final MutableLiveData<String> currentFontName = new MutableLiveData<>("System Default");
-    
+
+    // Current font size in pt
+    private final MutableLiveData<Float> fontSize = new MutableLiveData<>(16f);
+
     // Getters for LiveData (read-only access)
     
     public LiveData<String> getText() {
@@ -50,7 +53,11 @@ public class TextViewModel extends ViewModel {
     public LiveData<String> getCurrentFontName() {
         return currentFontName;
     }
-    
+
+    public LiveData<Float> getFontSize() {
+        return fontSize;
+    }
+
     // Setters for updating values
     
     public void setText(String value) {
@@ -72,14 +79,8 @@ public class TextViewModel extends ViewModel {
     public void setCurrentFontName(String value) {
         currentFontName.setValue(value);
     }
-    
-    /**
-     * Called when ViewModel is no longer used and will be destroyed.
-     * Clean up any resources if needed.
-     */
-    @Override
-    protected void onCleared() {
-        super.onCleared();
-        // No cleanup needed for basic data types
+
+    public void setFontSize(float value) {
+        fontSize.setValue(value);
     }
 }

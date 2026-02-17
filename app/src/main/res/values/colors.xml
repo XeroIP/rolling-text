@@ -32,22 +32,19 @@
     <color name="md_theme_outline">#79747E</color>
     <color name="md_theme_outline_variant">#CAC4D0</color>
 
-    <!-- Legacy Theme Colors (for dynamic theme switching) -->
+    <!-- Theme Colors (for dynamic theme switching) -->
     <!-- Light Theme -->
     <color name="light_background">#FFFFFF</color>
     <color name="light_text">#000000</color>
     <color name="light_text_secondary">#666666</color>
-    <color name="light_edit_background">#F5F5F5</color>
 
     <!-- Dark Theme -->
     <color name="dark_background">#121212</color>
     <color name="dark_text">#FFFFFF</color>
     <color name="dark_text_secondary">#B0B0B0</color>
-    <color name="dark_edit_background">#1E1E1E</color>
 
-    <!-- Sepia Theme - More intense -->
+    <!-- Sepia Theme -->
     <color name="sepia_background">#E8D5B8</color>
     <color name="sepia_text">#2C1810</color>
     <color name="sepia_text_secondary">#5D4037</color>
-    <color name="sepia_edit_background">#D4BC98</color>
 </resources>

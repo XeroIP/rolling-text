@@ -7,13 +7,9 @@ import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -26,6 +22,7 @@ import android.view.View;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  * - Rolling character limit with Unicode/emoji support
  * - Theme selection (Light, Dark, Sepia)
  * - Font picker from system fonts
- * - Auto-save with debouncing to prevent excessive I/O
+ * - Text is never persisted - starts fresh every launch
  * - Configuration change handling (survives rotation)
  */
 public class MainActivity extends AppCompatActivity {
@@ -66,10 +63,10 @@ public class MainActivity extends AppCompatActivity {
     // TextWatcher instance (stored for proper cleanup)
     private TextWatcher textWatcher;
     
-    // Debouncing for auto-save
+    // Debouncing for ViewModel sync
     private Handler saveHandler;
     private Runnable saveRunnable;
-    private static final int SAVE_DELAY_MS = 500; // Save 500ms after user stops typing
+    private static final int SAVE_DELAY_MS = 500;
 
     // ExecutorService for background operations
     private ExecutorService backgroundExecutor;
@@ -84,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
     private ThemeManager themeManager;
 
     // Cached LiveData values to avoid null checks
-    private int cachedMaxCharacters = 128;
+    private int cachedMaxCharacters = PreferencesRepository.DEFAULT_MAX_CHARS;
     private String cachedTheme = "light";
     private String cachedFontPath = null;
     private float cachedFontSize = 16f;
@@ -101,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
         viewModel = new ViewModelProvider(this).get(TextViewModel.class);
 
         // Initialize font manager
-        fontManager = new FontManager(this);
+        fontManager = new FontManager();
 
         // Initialize theme manager
         themeManager = new ThemeManager();
@@ -148,11 +145,6 @@ public class MainActivity extends AppCompatActivity {
         aboutButton = findViewById(R.id.aboutButton);
         rootView = findViewById(android.R.id.content);
 
-        // Set content descriptions for accessibility
-        settingsButton.setContentDescription(getString(R.string.desc_change_limit));
-        fontButton.setContentDescription(getString(R.string.desc_choose_font));
-        fontSizeButton.setContentDescription(getString(R.string.desc_change_font_size));
-
         // Make character counter less chatty for screen readers
         charCounter.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
@@ -163,11 +155,12 @@ public class MainActivity extends AppCompatActivity {
      */
     private void loadState(Bundle savedInstanceState) {
         if (savedInstanceState != null) {
-            // Restore from savedInstanceState (most recent state)
-            viewModel.setMaxCharacters(savedInstanceState.getInt("max_chars", 128));
+            // Restore from savedInstanceState (process death recovery)
+            viewModel.setMaxCharacters(savedInstanceState.getInt("max_chars", PreferencesRepository.DEFAULT_MAX_CHARS));
             viewModel.setCurrentTheme(savedInstanceState.getString("theme", "light"));
             viewModel.setCurrentFontPath(savedInstanceState.getString("font_path", null));
             viewModel.setCurrentFontName(savedInstanceState.getString("font_name", getString(R.string.font_system_default)));
+            viewModel.setFontSize(savedInstanceState.getFloat("font_size", 16f));
 
             String savedText = savedInstanceState.getString("current_text", "");
             viewModel.setText(savedText);
@@ -177,35 +170,23 @@ public class MainActivity extends AppCompatActivity {
             String text = viewModel.getText().getValue();
             if (text == null || text.isEmpty()) {
                 // First time initialization - load from SharedPreferences
-                int maxChars = preferencesRepo.getMaxCharacters();
-                String theme = preferencesRepo.getTheme();
-                String fontPath = preferencesRepo.getFontPath();
-                String fontName = preferencesRepo.getFontName();
-                String savedText = preferencesRepo.getText();
-                float fontSize = preferencesRepo.getFontSize();
-
-                viewModel.setMaxCharacters(maxChars);
-                viewModel.setCurrentTheme(theme);
-                viewModel.setCurrentFontPath(fontPath);
-                viewModel.setCurrentFontName(fontName);
-                viewModel.setText(savedText);
-
-                editText.setText(savedText);
-                editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, fontSize);
-                cachedFontSize = fontSize;
-
-                if (savedText != null && !savedText.isEmpty()) {
-                    editText.setSelection(savedText.length());
-                }
+                viewModel.setMaxCharacters(preferencesRepo.getMaxCharacters());
+                viewModel.setCurrentTheme(preferencesRepo.getTheme());
+                viewModel.setCurrentFontPath(preferencesRepo.getFontPath());
+                viewModel.setCurrentFontName(preferencesRepo.getFontName());
+                viewModel.setFontSize(preferencesRepo.getFontSize());
             }
         }
 
         // Cache LiveData values for performance and null-safety
         cachedMaxCharacters = viewModel.getMaxCharacters().getValue() != null ?
-            viewModel.getMaxCharacters().getValue() : 128;
+            viewModel.getMaxCharacters().getValue() : PreferencesRepository.DEFAULT_MAX_CHARS;
         cachedTheme = viewModel.getCurrentTheme().getValue() != null ?
             viewModel.getCurrentTheme().getValue() : "light";
         cachedFontPath = viewModel.getCurrentFontPath().getValue();
+        cachedFontSize = viewModel.getFontSize().getValue() != null ?
+            viewModel.getFontSize().getValue() : 16f;
+        editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, cachedFontSize);
     }
 
     /**
@@ -217,7 +198,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Set up the TextWatcher with proper Unicode handling and debounced auto-save.
+     * Set up the TextWatcher with proper Unicode handling and debounced ViewModel sync.
      */
     private void setupTextWatcher() {
         textWatcher = new TextWatcher() {
@@ -241,7 +222,7 @@ public class MainActivity extends AppCompatActivity {
                 // Update character counter
                 updateCounter();
 
-                // Debounce save operation to prevent excessive I/O
+                // Debounce ViewModel sync
                 debouncedSave(s.toString());
             }
         };
@@ -268,8 +249,9 @@ public class MainActivity extends AppCompatActivity {
      * Enforces the rolling character limit by removing oldest characters.
      * Uses Unicode code points to properly handle emoji and multi-byte characters.
      * <p>
-     * CRITICAL FIX: Handles emoji correctly by counting code points instead of char units.
-     * Example: "👨‍👩‍👧‍👦" (family emoji) is 1 code point, not 11 char units.
+     * Handles emoji correctly by counting code points instead of char units.
+     * Example: "😀" is 1 code point but 2 UTF-16 char units (surrogate pair).
+     * Note: Complex emoji like "👨‍👩‍👧‍👦" are multiple code points joined by ZWJ.
      * 
      * @param editable The text content being edited
      */
@@ -318,58 +300,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Debounces save operations to prevent excessive I/O.
-     * Saves 500ms after the user stops typing.
-     * <p>
-     * CRITICAL FIX: Prevents saving on every keystroke which caused poor performance.
-     * 
-     * @param text The text to save
+     * Debounces ViewModel sync to avoid updating on every keystroke.
+     *
+     * @param text The text to sync to ViewModel
      */
     private void debouncedSave(String text) {
-        // Cancel any pending save
         if (saveRunnable != null) {
             saveHandler.removeCallbacks(saveRunnable);
         }
-        
-        // Schedule new save
-        saveRunnable = () -> {
-            viewModel.setText(text);
-            preferencesRepo.saveText(text);
-        };
+
+        saveRunnable = () -> viewModel.setText(text);
         saveHandler.postDelayed(saveRunnable, SAVE_DELAY_MS);
     }
 
     /**
-     * Shows dialog to change the character limit and auto-save settings.
+     * Shows dialog to change the character limit.
      * Warns user if the new limit would truncate existing text.
      */
     private void showLimitDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.dialog_title_limit);
 
-        // Create a layout to hold both EditText and CheckBox
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(60, 20, 60, 20);
-
         final EditText input = new EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        input.setHint("Character limit");
+        input.setHint(R.string.hint_character_limit);
         input.setText(String.valueOf(cachedMaxCharacters));
         input.setSelection(input.getText().length());
-        layout.addView(input);
-
-        final CheckBox autoSaveCheckbox = new CheckBox(this);
-        autoSaveCheckbox.setText("Save text when closing app");
-        autoSaveCheckbox.setChecked(preferencesRepo.getAutoSaveText());
-        layout.addView(autoSaveCheckbox);
-
-        builder.setView(layout);
+        input.setPadding(60, 20, 60, 20);
+        builder.setView(input);
 
         builder.setPositiveButton(getString(R.string.button_ok), (dialog, which) -> {
-            // Save auto-save preference
-            preferencesRepo.setAutoSaveText(autoSaveCheckbox.isChecked());
-
             String inputText = input.getText().toString();
             if (!inputText.isEmpty()) {
                 try {
@@ -401,11 +361,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        builder.setNegativeButton(getString(R.string.button_cancel), (dialog, which) -> {
-            // Still save the checkbox state even if cancelled
-            preferencesRepo.setAutoSaveText(autoSaveCheckbox.isChecked());
-            dialog.cancel();
-        });
+        builder.setNegativeButton(getString(R.string.button_cancel), null);
         builder.show();
     }
 
@@ -520,8 +476,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Find current selection
         for (int i = 0; i < fontPaths.size(); i++) {
-            if ((cachedFontPath == null && fontPaths.get(i) == null) ||
-                (cachedFontPath != null && cachedFontPath.equals(fontPaths.get(i)))) {
+            if (Objects.equals(cachedFontPath, fontPaths.get(i))) {
                 currentSelection = i;
                 break;
             }
@@ -575,7 +530,7 @@ public class MainActivity extends AppCompatActivity {
      * @param theme Theme name ("light", "dark", or "sepia")
      */
     private void applyTheme(String theme) {
-        themeManager.applyTheme(theme, rootView, null, charCounter, null, editText);
+        themeManager.applyTheme(theme, this, rootView, charCounter, editText);
     }
     
     /**
@@ -611,6 +566,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * Applies a new font size and saves it.
+     *
+     * @param size Font size in pt
+     */
+    private void applyFontSize(float size) {
+        cachedFontSize = size;
+        viewModel.setFontSize(size);
+        editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, size);
+        preferencesRepo.saveFontSize(size);
+    }
+
+    /**
      * Shows dialog to change font size with list and custom input.
      */
     private void showFontSizeDialog() {
@@ -634,9 +601,7 @@ public class MainActivity extends AppCompatActivity {
                 showCustomFontSizeDialog();
             } else {
                 float newSize = sizeValues[which];
-                cachedFontSize = newSize;
-                editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, newSize);
-                preferencesRepo.saveFontSize(newSize);
+                applyFontSize(newSize);
                 dialog.dismiss();
             }
         });
@@ -653,7 +618,7 @@ public class MainActivity extends AppCompatActivity {
 
         final EditText input = new EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        input.setHint("Enter size in pt (6-72)");
+        input.setHint(R.string.hint_font_size);
         input.setText(String.valueOf((int)cachedFontSize));
         input.setSelection(input.getText().length());
         builder.setView(input);
@@ -664,11 +629,9 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     int newSize = Integer.parseInt(inputText);
                     if (newSize >= 6 && newSize <= 72) {
-                        cachedFontSize = newSize;
-                        editText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PT, newSize);
-                        preferencesRepo.saveFontSize(newSize);
+                        applyFontSize(newSize);
                     } else {
-                        showErrorDialog("Please enter a size between 6 and 72 pt");
+                        showErrorDialog(getString(R.string.error_font_size_range));
                     }
                 } catch (NumberFormatException e) {
                     showErrorDialog(getString(R.string.error_invalid_number));
@@ -709,26 +672,19 @@ public class MainActivity extends AppCompatActivity {
         outState.putString("theme", viewModel.getCurrentTheme().getValue());
         outState.putString("font_path", viewModel.getCurrentFontPath().getValue());
         outState.putString("font_name", viewModel.getCurrentFontName().getValue());
+        Float fontSize = viewModel.getFontSize().getValue();
+        if (fontSize != null) {
+            outState.putFloat("font_size", fontSize);
+        }
     }
 
-    /**
-     * Save text immediately when app goes to background (if auto-save is enabled).
-     * Cancels any pending debounced save and saves immediately.
-     */
     @Override
     protected void onPause() {
         super.onPause();
 
-        // Cancel pending save
+        // Cancel pending ViewModel sync
         if (saveRunnable != null) {
             saveHandler.removeCallbacks(saveRunnable);
-        }
-
-        // Only save if auto-save is enabled
-        if (preferencesRepo.getAutoSaveText()) {
-            String currentText = editText.getText().toString();
-            viewModel.setText(currentText);
-            preferencesRepo.saveText(currentText);
         }
     }
 

@@ -1,6 +1,5 @@
 package com.example.rollingtext;
 
-import android.content.Context;
 import android.graphics.Typeface;
 import android.util.Log;
 import java.io.File;
@@ -25,12 +24,7 @@ public class FontManager {
         }
     };
 
-    private List<File> cachedFonts = null;
-    private final Context context;
-
-    public FontManager(Context context) {
-        this.context = context;
-    }
+    private volatile List<File> cachedFonts = null;
 
     /**
      * Get cached font list, or scan if not cached.

@@ -1,9 +1,10 @@
 package com.example.rollingtext;
 
-import android.graphics.drawable.GradientDrawable;
+import android.content.Context;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
+import androidx.core.content.ContextCompat;
 
 /**
  * Manages theme colors and application to views.
@@ -19,47 +20,40 @@ public class ThemeManager {
         public final int background;
         public final int text;
         public final int textSecondary;
-        public final int editBackground;
 
-        public ThemeColors(int bg, int txt, int txtSec, int editBg) {
+        public ThemeColors(int bg, int txt, int txtSec) {
             background = bg;
             text = txt;
             textSecondary = txtSec;
-            editBackground = editBg;
         }
     }
 
-    // Reusable drawable for EditText background (prevents recreation)
-    private GradientDrawable editTextDrawable;
-
     /**
-     * Get theme colors for the specified theme.
+     * Get theme colors for the specified theme, resolved from XML color resources.
      *
      * @param theme Theme name ("light", "dark", or "sepia")
+     * @param context Context for resolving color resources
      * @return ThemeColors object with color values
      */
-    public ThemeColors getThemeColors(String theme) {
+    public ThemeColors getThemeColors(String theme, Context context) {
         switch (theme) {
             case "dark":
                 return new ThemeColors(
-                    0xFF121212, // background
-                    0xFFFFFFFF, // text
-                    0xFFB0B0B0, // text secondary
-                    0xFF1E1E1E  // edit background
+                    ContextCompat.getColor(context, R.color.dark_background),
+                    ContextCompat.getColor(context, R.color.dark_text),
+                    ContextCompat.getColor(context, R.color.dark_text_secondary)
                 );
             case "sepia":
                 return new ThemeColors(
-                    0xFFE8D5B8, // background - more intense
-                    0xFF2C1810, // text - darker
-                    0xFF5D4037, // text secondary - more intense
-                    0xFFD4BC98  // edit background - more intense
+                    ContextCompat.getColor(context, R.color.sepia_background),
+                    ContextCompat.getColor(context, R.color.sepia_text),
+                    ContextCompat.getColor(context, R.color.sepia_text_secondary)
                 );
             default: // light
                 return new ThemeColors(
-                    0xFFFFFFFF, // background
-                    0xFF000000, // text
-                    0xFF666666, // text secondary
-                    0xFFF5F5F5  // edit background
+                    ContextCompat.getColor(context, R.color.light_background),
+                    ContextCompat.getColor(context, R.color.light_text),
+                    ContextCompat.getColor(context, R.color.light_text_secondary)
                 );
         }
     }
@@ -68,34 +62,22 @@ public class ThemeManager {
      * Apply theme to views.
      *
      * @param theme Theme name ("light", "dark", or "sepia")
+     * @param context Context for resolving color resources
      * @param rootView Root view for background
-     * @param titleText Title text view (can be null)
      * @param charCounter Character counter text view
-     * @param limitLabel Limit label text view (can be null)
      * @param editText Edit text view
      */
-    public void applyTheme(String theme, View rootView, TextView titleText,
-                          TextView charCounter, TextView limitLabel, EditText editText) {
-        ThemeColors colors = getThemeColors(theme);
+    public void applyTheme(String theme, Context context, View rootView,
+                          TextView charCounter, EditText editText) {
+        ThemeColors colors = getThemeColors(theme, context);
 
-        // Apply colors to views
         rootView.setBackgroundColor(colors.background);
 
-        // Only apply to views that exist
-        if (titleText != null) {
-            titleText.setTextColor(colors.text);
-        }
         if (charCounter != null) {
             charCounter.setTextColor(colors.textSecondary);
-        }
-        if (limitLabel != null) {
-            limitLabel.setTextColor(colors.textSecondary);
         }
 
         editText.setTextColor(colors.text);
         editText.setHintTextColor(colors.textSecondary);
-
-        // Don't set background - using Material 3 transparent background
-        // The EditText has android:background="@null" for borderless design
     }
 }

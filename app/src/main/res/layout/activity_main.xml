@@ -50,7 +50,7 @@
             android:layout_height="wrap_content"
             android:text="@string/default_counter"
             android:textSize="14sp"
-            android:textColor="#666666" />
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
     </LinearLayout>
 
