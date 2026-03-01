@@ -1,0 +1,1 @@
+ C:\\SourceControl\\rolling-text\\.dart_tool\\flutter_build\\ea59f139372823a3f59fd1f8818d0e4d\\dart_build_result.json:  C:\\SourceControl\\rolling-text\\.dart_tool\\package_config.json C:\\SourceControl\\rolling-text\\pubspec.yaml C:\\tools\\flutter\\bin\\cache\\dart-sdk\\version c:\\sourcecontrol\\rolling-text\\.dart_tool\\package_config.json

@@ -1,0 +1,25 @@
+name: rolling_text
+description: "A rolling character limit text app. Write your thoughts and let them go."
+publish_to: 'none'
+
+version: 3.0.0+3
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  shared_preferences: ^2.5.4
+  provider: ^6.1.5
+  google_fonts: ^8.0.2
+  package_info_plus: ^8.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
