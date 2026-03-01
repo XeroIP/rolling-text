@@ -1,9 +1,11 @@
 # Rolling Text
 
 [![Android](https://img.shields.io/badge/Android-7.0%2B-green)](https://www.android.com)
+[![iOS](https://img.shields.io/badge/iOS-12.0%2B-blue)](https://www.apple.com/ios/)
+[![Web](https://img.shields.io/badge/Web-Chrome%2FSafari-orange)](https://github.com/XeroIP/rolling-text)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A simple Android app that gives you a place to write down your thoughts without keeping them. As you type, older text quietly disappears. Nothing is saved. Nothing is stored.
+A simple app for Android, iOS, and Web that gives you a place to write down your thoughts without keeping them. As you type, older text quietly disappears. Nothing is saved. Nothing is stored.
 
 ## About
 
@@ -41,43 +43,64 @@ Type: "Hello World" -> "ello World" ('H' removed automatically)
 
 - **Configurable character limit** - Set anywhere from 1 to 1,000,000 characters
 - **Themes** - Light, Dark, and Sepia
-- **Font picker** - Choose from any font installed on your device
-- **Adjustable font size** - 6pt to 72pt
-- **Auto-save** - Optionally saves your text and preferences between sessions
+- **Font picker** - Choose from 20 curated Google Fonts or System Default
+- **Adjustable font size** - 6pt to 144pt via slider, with custom sizes up to 999pt
+- **Settings persistence** - Character limit, theme, font, and font size are saved between sessions. Text is never saved.
 - **Unicode and emoji support** - Handles multi-byte characters correctly
-- **Accessibility** - Screen reader support with content descriptions
 
 ## Installation
 
-### From source
+### Run from source
 
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/PeterKirschman/rolling-text.git
+    git clone https://github.com/XeroIP/rolling-text.git
+    cd rolling-text
     ```
 
-2. Open in Android Studio and run on a device or emulator.
+2. Install dependencies:
+
+    ```bash
+    flutter pub get
+    ```
+
+3. Run on your target platform:
+
+    ```bash
+    flutter run -d chrome        # Web
+    flutter run -d android       # Android device or emulator
+    flutter run -d ios           # iOS device or simulator (requires macOS + Xcode)
+    ```
+
+### Build
+
+```bash
+flutter build apk                        # Android APK
+flutter build appbundle                  # Android App Bundle
+flutter build ios --no-codesign          # iOS (requires macOS + Xcode)
+flutter build web                        # Web
+```
 
 ### APK download
 
-Download the latest APK from the [Releases](https://github.com/PeterKirschman/rolling-text/releases) page.
+Download the latest APK from the [Releases](https://github.com/XeroIP/rolling-text/releases) page.
 
 ## Technical Details
 
-- **Min SDK**: Android 7.0 (API 24)
-- **Target SDK**: Android 14 (API 34)
-- **Language**: Java 11
-- **Architecture**: MVVM
-- **Dependencies**: AndroidX AppCompat, ConstraintLayout, Material Components, Lifecycle (ViewModel, LiveData)
+- **Platforms**: Android, iOS, Web
+- **Language**: Dart
+- **Framework**: Flutter 3.x
+- **Architecture**: Provider (ChangeNotifier)
+- **Dependencies**: `provider`, `shared_preferences`, `google_fonts`
 
 ## Roadmap
 
-Have an idea for Rolling Text? Feature requests are welcome on the [GitHub Issues](https://github.com/PeterKirschman/rolling-text/issues) page.
+Have an idea for Rolling Text? Feature requests are welcome on the [GitHub Issues](https://github.com/XeroIP/rolling-text/issues) page.
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Open an issue or submit a pull request on [GitHub](https://github.com/XeroIP/rolling-text).
 
 ## License
 
