@@ -58,6 +58,12 @@ Thumbs.db
 # Log files
 *.log
 
+# Android legacy build artifacts
+android-legacy/.gradle/
+android-legacy/app/release/
+android-legacy/local.properties
+android-legacy/nul
+
 # Release keys
 release-key/
 release-key
