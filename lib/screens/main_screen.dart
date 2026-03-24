@@ -244,6 +244,7 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: () {
                       final value = int.tryParse(inputController.text);
                       if (value == null || value < 1 || value > 1000000) {
+                        Navigator.pop(ctx);
                         _showErrorDialog(context,
                             'Please enter a number between 1 and 1,000,000');
                         return;
@@ -566,6 +567,7 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: () {
                       final value = int.tryParse(inputController.text);
                       if (value == null || value < 6 || value > 999) {
+                        Navigator.pop(ctx);
                         _showErrorDialog(
                             context, 'Please enter a size between 6 and 999 pt');
                         return;
