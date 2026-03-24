@@ -473,7 +473,6 @@ class _MainScreenState extends State<MainScreen> {
                   onChanged: (value) {
                     setSheetState(() => currentSize = value.roundToDouble());
                     settings.setFontSize(currentSize);
-                    widget.prefsService.saveFontSize(currentSize);
                   },
                 ),
                 Row(
@@ -496,7 +495,9 @@ class _MainScreenState extends State<MainScreen> {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      widget.prefsService.saveFontSize(settings.fontSize);
+    });
   }
 
   void _showCustomFontSizeDialog(BuildContext context, AppSettings settings) {
