@@ -115,7 +115,7 @@ class _MainScreenState extends State<MainScreen> {
                   decoration: InputDecoration(
                     border: InputBorder.none,
                     hintText: 'Start typing\u2026',
-                    hintStyle: TextStyle(color: colors.textSecondary),
+                    hintStyle: _textStyle(settings).copyWith(color: colors.textSecondary),
                   ),
                 ),
               ),
