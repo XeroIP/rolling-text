@@ -43,6 +43,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _controller = TextEditingController();
+  final ValueNotifier<int> _charCount = ValueNotifier<int>(0);
   bool _isEnforcing = false;
   String _version = '';
 
@@ -57,6 +58,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _charCount.dispose();
     super.dispose();
   }
 
@@ -78,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
       );
       _isEnforcing = false;
     }
-    setState(() {});
+    _charCount.value = _codePointCount(_controller.text);
   }
 
   TextStyle _textStyle(AppSettings settings) {
@@ -93,7 +95,6 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final settings = context.watch<AppSettings>();
     final colors = colorsFor(settings.theme);
-    final charCount = _codePointCount(_controller.text);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -122,12 +123,15 @@ class _MainScreenState extends State<MainScreen> {
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Semantics(
-                    label: '$charCount of ${settings.maxChars} characters used',
-                    child: Text(
-                      '$charCount / ${settings.maxChars}',
-                      style:
-                          TextStyle(color: colors.textSecondary, fontSize: 14),
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _charCount,
+                    builder: (_, count, __) => Semantics(
+                      label: '$count of ${settings.maxChars} characters used',
+                      child: Text(
+                        '$count / ${settings.maxChars}',
+                        style:
+                            TextStyle(color: colors.textSecondary, fontSize: 14),
+                      ),
                     ),
                   ),
                 ),
