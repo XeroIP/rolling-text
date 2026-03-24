@@ -122,7 +122,8 @@ class _MainScreenState extends State<MainScreen> {
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: ExcludeSemantics(
+                  child: Semantics(
+                    label: '$charCount of ${settings.maxChars} characters used',
                     child: Text(
                       '$charCount / ${settings.maxChars}',
                       style:
