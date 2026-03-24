@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/app_settings.dart';
 import '../services/preferences_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/text_truncation.dart';
 
 
 /// Curated list of 20 Google Fonts, sorted alphabetically.
@@ -62,25 +63,19 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  int _codePointCount(String text) => text.runes.length;
-
   void _onTextChanged(String text, AppSettings settings) {
     if (_isEnforcing) return;
 
-    final count = _codePointCount(text);
-    if (count > settings.maxChars) {
+    if (text.runes.length > settings.maxChars) {
       _isEnforcing = true;
-      final runes = text.runes.toList();
-      final trimmed = String.fromCharCodes(
-        runes.sublist(runes.length - settings.maxChars),
-      );
+      final trimmed = truncateRollingText(text, settings.maxChars);
       _controller.value = TextEditingValue(
         text: trimmed,
         selection: TextSelection.collapsed(offset: trimmed.length),
       );
       _isEnforcing = false;
     }
-    _charCount.value = _codePointCount(_controller.text);
+    _charCount.value = _controller.text.runes.length;
   }
 
   TextStyle _textStyle(AppSettings settings) {
@@ -125,7 +120,7 @@ class _MainScreenState extends State<MainScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: ValueListenableBuilder<int>(
                     valueListenable: _charCount,
-                    builder: (_, count, __) => Semantics(
+                    builder: (_, count, _) => Semantics(
                       label: '$count of ${settings.maxChars} characters used',
                       child: Text(
                         '$count / ${settings.maxChars}',
@@ -268,7 +263,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _applyNewLimit(int newLimit, AppSettings settings) {
-    final currentCount = _codePointCount(_controller.text);
+    final currentCount = _controller.text.runes.length;
 
     if (newLimit < currentCount) {
       final charsToRemove = currentCount - newLimit;
