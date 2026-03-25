@@ -2,7 +2,7 @@ name: rolling_text
 description: "A rolling character limit text app. Write your thoughts and let them go."
 publish_to: 'none'
 
-version: 3.0.0+3
+version: 0.3.0+1
 
 environment:
   sdk: ^3.10.4

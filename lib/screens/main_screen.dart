@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/app_settings.dart';
 import '../services/preferences_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/text_truncation.dart';
 
 
 /// Curated list of 20 Google Fonts, sorted alphabetically.
@@ -43,6 +44,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _controller = TextEditingController();
+  final ValueNotifier<int> _charCount = ValueNotifier<int>(0);
   bool _isEnforcing = false;
   String _version = '';
 
@@ -57,28 +59,23 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _charCount.dispose();
     super.dispose();
   }
-
-  int _codePointCount(String text) => text.runes.length;
 
   void _onTextChanged(String text, AppSettings settings) {
     if (_isEnforcing) return;
 
-    final count = _codePointCount(text);
-    if (count > settings.maxChars) {
+    if (text.runes.length > settings.maxChars) {
       _isEnforcing = true;
-      final runes = text.runes.toList();
-      final trimmed = String.fromCharCodes(
-        runes.sublist(runes.length - settings.maxChars),
-      );
+      final trimmed = truncateRollingText(text, settings.maxChars);
       _controller.value = TextEditingValue(
         text: trimmed,
         selection: TextSelection.collapsed(offset: trimmed.length),
       );
       _isEnforcing = false;
     }
-    setState(() {});
+    _charCount.value = _controller.text.runes.length;
   }
 
   TextStyle _textStyle(AppSettings settings) {
@@ -93,7 +90,6 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final settings = context.watch<AppSettings>();
     final colors = colorsFor(settings.theme);
-    final charCount = _codePointCount(_controller.text);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -114,7 +110,7 @@ class _MainScreenState extends State<MainScreen> {
                   decoration: InputDecoration(
                     border: InputBorder.none,
                     hintText: 'Start typing\u2026',
-                    hintStyle: TextStyle(color: colors.textSecondary),
+                    hintStyle: _textStyle(settings).copyWith(color: colors.textSecondary),
                   ),
                 ),
               ),
@@ -122,11 +118,15 @@ class _MainScreenState extends State<MainScreen> {
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: ExcludeSemantics(
-                    child: Text(
-                      '$charCount / ${settings.maxChars}',
-                      style:
-                          TextStyle(color: colors.textSecondary, fontSize: 14),
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _charCount,
+                    builder: (_, count, _) => Semantics(
+                      label: '$count of ${settings.maxChars} characters used',
+                      child: Text(
+                        '$count / ${settings.maxChars}',
+                        style:
+                            TextStyle(color: colors.textSecondary, fontSize: 14),
+                      ),
                     ),
                   ),
                 ),
@@ -243,6 +243,7 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: () {
                       final value = int.tryParse(inputController.text);
                       if (value == null || value < 1 || value > 1000000) {
+                        Navigator.pop(ctx);
                         _showErrorDialog(context,
                             'Please enter a number between 1 and 1,000,000');
                         return;
@@ -262,7 +263,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _applyNewLimit(int newLimit, AppSettings settings) {
-    final currentCount = _codePointCount(_controller.text);
+    final currentCount = _controller.text.runes.length;
 
     if (newLimit < currentCount) {
       final charsToRemove = currentCount - newLimit;
@@ -473,7 +474,6 @@ class _MainScreenState extends State<MainScreen> {
                   onChanged: (value) {
                     setSheetState(() => currentSize = value.roundToDouble());
                     settings.setFontSize(currentSize);
-                    widget.prefsService.saveFontSize(currentSize);
                   },
                 ),
                 Row(
@@ -496,7 +496,9 @@ class _MainScreenState extends State<MainScreen> {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      widget.prefsService.saveFontSize(settings.fontSize);
+    });
   }
 
   void _showCustomFontSizeDialog(BuildContext context, AppSettings settings) {
@@ -564,6 +566,7 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: () {
                       final value = int.tryParse(inputController.text);
                       if (value == null || value < 6 || value > 999) {
+                        Navigator.pop(ctx);
                         _showErrorDialog(
                             context, 'Please enter a size between 6 and 999 pt');
                         return;

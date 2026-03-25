@@ -5,7 +5,7 @@ All notable changes to Rolling Text will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.0.0] - 2026-02-28
+## [0.3.0] - 2026-02-28
 
 ### Complete Rewrite in Flutter
 
@@ -37,7 +37,7 @@ The app has been rewritten from scratch in Flutter/Dart, replacing the native An
 
 ---
 
-## [2.1.0] - 2026-02-13
+## [0.2.1] - 2026-02-13
 
 ### Code Quality & Correctness Release
 
@@ -92,7 +92,7 @@ This release removes text persistence (the app now always starts with a blank ed
 
 ---
 
-## [2.0.0] - 2026-02-12
+## [0.2.0] - 2026-02-12
 
 ### Major Release - Production Ready
 
@@ -222,7 +222,7 @@ This release includes comprehensive improvements based on a thorough code review
 - **Files Changed**: 7
 - **New Classes**: 2 (TextViewModel, PreferencesRepository)
 
-## [1.0.0] - 2026-02-11
+## [0.1.0] - 2026-02-11
 
 ### Initial Release
 
@@ -234,7 +234,7 @@ This release includes comprehensive improvements based on a thorough code review
 - Auto-save to SharedPreferences
 - Basic UI with three buttons
 
-#### Known Issues (Fixed in 2.0.0)
+#### Known Issues (Fixed in 0.2.0)
 - Emoji counted incorrectly
 - Text lost on screen rotation
 - Performance issues with typing

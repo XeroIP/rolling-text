@@ -50,6 +50,10 @@ Type: "Hello World" -> "ello World" ('H' removed automatically)
 
 ## Installation
 
+### Web app
+
+Try it in your browser at https://xeroip.github.io/rolling-text/
+
 ### Run from source
 
 1. Clone the repository:
