@@ -69,6 +69,7 @@ release-key/
 release-key
 *.jks
 *.keystore
+android/key.properties
 
 # Claude-specific
 .claude/
