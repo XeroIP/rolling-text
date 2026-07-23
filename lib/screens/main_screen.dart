@@ -99,19 +99,36 @@ class _MainScreenState extends State<MainScreen> {
           child: Column(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _controller,
-                  onChanged: (text) => _onTextChanged(text, settings),
-                  maxLines: null,
-                  expands: true,
-                  textAlignVertical: TextAlignVertical.top,
-                  autofocus: true,
-                  style: _textStyle(settings).copyWith(color: colors.text),
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    hintText: 'Start typing\u2026',
-                    hintStyle: _textStyle(settings).copyWith(color: colors.textSecondary),
-                  ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned.fill(
+                      child: Semantics(
+                        label: 'Start typing',
+                        child: TextField(
+                          controller: _controller,
+                          onChanged: (text) => _onTextChanged(text, settings),
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          autofocus: true,
+                          style: _textStyle(settings).copyWith(color: colors.text),
+                          decoration: const InputDecoration(border: InputBorder.none),
+                        ),
+                      ),
+                    ),
+                    ValueListenableBuilder<int>(
+                      valueListenable: _charCount,
+                      builder: (_, count, _) => count == 0
+                          ? ExcludeSemantics(
+                              child: Text(
+                                'Start typing\u2026',
+                                style: _textStyle(settings).copyWith(color: colors.textSecondary),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
               ),
               Align(
