@@ -43,7 +43,7 @@ Type: "Hello World" -> "ello World" ('H' removed automatically)
 
 - **Configurable character limit** - Set anywhere from 1 to 1,000,000 characters
 - **Themes** - Light, Dark, and Sepia
-- **Font picker** - Choose from 20 curated Google Fonts or System Default
+- **Font picker** - Choose from 20 curated Google Fonts or System Default. Uncached fonts require an internet connection on first use.
 - **Adjustable font size** - 6pt to 144pt via slider, with custom sizes up to 999pt
 - **Settings persistence** - Character limit, theme, font, and font size are saved between sessions. Text is never saved.
 - **Unicode and emoji support** - Handles multi-byte characters correctly

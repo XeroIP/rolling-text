@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Google Fonts downloads uncached font files at runtime. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="rolling_text"
         android:name="${applicationName}"
