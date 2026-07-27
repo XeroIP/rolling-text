@@ -167,6 +167,102 @@ void main() {
     });
   });
 
+  group('numeric sheets only commit valid values', () {
+    testWidgets('an invalid limit keeps the sheet open with the value intact', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      final before = _settings(tester).maxChars;
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '0');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invalid Input'), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Character Limit'),
+        findsOneWidget,
+        reason: 'Closing the sheet would discard the value the user must fix',
+      );
+      expect(_sheetInput(tester).text, '0');
+      expect(_settings(tester).maxChars, before);
+    });
+
+    testWidgets('a rejected limit is refocused and reselected for retyping', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '0');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(
+        _sheetInput(tester).selection,
+        const TextSelection(baseOffset: 0, extentOffset: 1),
+      );
+      expect(tester.testTextInput.hasAnyClients, isTrue);
+    });
+
+    testWidgets('a corrected limit applies after a rejection', (tester) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '0');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).last, '300');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Character Limit'), findsNothing);
+      expect(_settings(tester).maxChars, 300);
+    });
+
+    testWidgets('cancelling the limit sheet changes nothing', (tester) async {
+      await _pumpMainScreen(tester);
+      final before = _settings(tester).maxChars;
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '900');
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(_settings(tester).maxChars, before);
+    });
+
+    testWidgets('an invalid font size keeps the sheet open', (tester) async {
+      await _pumpMainScreen(tester);
+      final before = _settings(tester).fontSize;
+
+      await _openCustomFontSize(tester);
+      await tester.enterText(find.byType(TextField).last, '3');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invalid Input'), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Custom Font Size'), findsOneWidget);
+      expect(_settings(tester).fontSize, before);
+    });
+  });
+
   group('theme and font sheets are keyboard navigable', () {
     testWidgets('theme sheet opens with the active theme focused', (
       tester,

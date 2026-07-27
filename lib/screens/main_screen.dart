@@ -195,101 +195,21 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showLimitDialog(BuildContext context, AppSettings settings) {
-    final inputController =
-        TextEditingController(text: '${settings.maxChars}');
-    // Preselect so the first keystroke replaces the current limit rather than
-    // appending to it.
-    inputController.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: inputController.text.length,
-    );
-
-    showModalBottomSheet(
+  Future<void> _showLimitDialog(BuildContext context, AppSettings settings) async {
+    final newLimit = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) {
-        final colors = colorsFor(settings.theme);
-
-        void applyLimit() {
-          final value = int.tryParse(inputController.text);
-          if (value == null || value < 1 || value > 1000000) {
-            Navigator.pop(ctx);
-            _showErrorDialog(
-              context,
-              'Please enter a number between 1 and 1,000,000',
-            );
-            return;
-          }
-          Navigator.pop(ctx);
-          _applyNewLimit(value, settings);
-        }
-
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            24, 16, 24,
-            MediaQuery.of(ctx).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Character Limit',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.text,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: inputController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => applyLimit(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18),
-                decoration: InputDecoration(
-                  hintText: '1 \u2013 1,000,000',
-                  filled: true,
-                  fillColor: colors.buttonBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: applyLimit,
-                    child: const Text('Apply'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (ctx) => _NumericSheet(
+        title: 'Character Limit',
+        hintText: '1 – 1,000,000',
+        initialValue: settings.maxChars,
+        minValue: 1,
+        maxValue: 1000000,
+        errorMessage: 'Please enter a number between 1 and 1,000,000',
+        colors: colorsFor(settings.theme),
+      ),
     );
+    if (newLimit != null) _applyNewLimit(newLimit, settings);
   }
 
   void _applyNewLimit(int newLimit, AppSettings settings) {
@@ -517,102 +437,27 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _showCustomFontSizeDialog(BuildContext context, AppSettings settings) {
-    final inputController =
-        TextEditingController(text: '${settings.fontSize.toInt()}');
-    // Preselect so the first keystroke replaces the current size rather than
-    // appending to it.
-    inputController.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: inputController.text.length,
-    );
-
-    showModalBottomSheet(
+  Future<void> _showCustomFontSizeDialog(
+    BuildContext context,
+    AppSettings settings,
+  ) async {
+    final newSize = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) {
-        final colors = colorsFor(settings.theme);
-
-        void applyFontSize() {
-          final value = int.tryParse(inputController.text);
-          if (value == null || value < 6 || value > 999) {
-            Navigator.pop(ctx);
-            _showErrorDialog(
-              context,
-              'Please enter a size between 6 and 999 pt',
-            );
-            return;
-          }
-          settings.setFontSize(value.toDouble());
-          widget.prefsService.saveFontSize(value.toDouble());
-          Navigator.pop(ctx);
-        }
-
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            24, 16, 24,
-            MediaQuery.of(ctx).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Custom Font Size',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.text,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: inputController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => applyFontSize(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18),
-                decoration: InputDecoration(
-                  hintText: '6 \u2013 999',
-                  filled: true,
-                  fillColor: colors.buttonBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: applyFontSize,
-                    child: const Text('Apply'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (ctx) => _NumericSheet(
+        title: 'Custom Font Size',
+        hintText: '6 – 999',
+        initialValue: settings.fontSize.toInt(),
+        minValue: 6,
+        maxValue: 999,
+        errorMessage: 'Please enter a size between 6 and 999 pt',
+        colors: colorsFor(settings.theme),
+      ),
     );
+    if (newSize != null) {
+      settings.setFontSize(newSize.toDouble());
+      widget.prefsService.saveFontSize(newSize.toDouble());
+    }
   }
 
   void _showAboutSheet(BuildContext context, String version) {
@@ -762,16 +607,151 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showErrorDialog(BuildContext context, String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Invalid Input'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
+}
+
+/// A bottom sheet that collects one whole number in a range.
+///
+/// Returns the accepted value via [Navigator.pop], so the caller decides what
+/// to persist and nothing is committed unless the user applies a valid entry.
+/// Stateful so the field's controller and focus node are disposed with the
+/// sheet rather than leaking on every open.
+class _NumericSheet extends StatefulWidget {
+  final String title;
+  final String hintText;
+  final int initialValue;
+  final int minValue;
+  final int maxValue;
+  final String errorMessage;
+  final AppColors colors;
+
+  const _NumericSheet({
+    required this.title,
+    required this.hintText,
+    required this.initialValue,
+    required this.minValue,
+    required this.maxValue,
+    required this.errorMessage,
+    required this.colors,
+  });
+
+  @override
+  State<_NumericSheet> createState() => _NumericSheetState();
+}
+
+class _NumericSheetState extends State<_NumericSheet> {
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.initialValue}');
+    _selectAll();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  /// Selects the whole value so the next keystroke replaces it rather than
+  /// appending to it.
+  void _selectAll() {
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
+  Future<void> _apply() async {
+    final value = int.tryParse(_controller.text);
+    if (value == null || value < widget.minValue || value > widget.maxValue) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Invalid Input'),
+          content: Text(widget.errorMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      // The sheet deliberately stays open: closing it would discard the value
+      // the user has just been asked to correct.
+      if (!mounted) return;
+      _focusNode.requestFocus();
+      _selectAll();
+      return;
+    }
+    if (!mounted) return;
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24, 16, 24,
+        MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(
+                widget.title,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colors.text,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _apply(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 18),
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              filled: true,
+              fillColor: colors.buttonBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: _apply, child: const Text('Apply')),
+            ],
           ),
         ],
       ),
