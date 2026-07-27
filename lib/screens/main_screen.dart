@@ -360,6 +360,10 @@ class _MainScreenState extends State<MainScreen> {
               ...AppTheme.values.map((theme) {
                 final themeColors = colorsFor(theme);
                 return ListTile(
+                  // Opening on the active row lets arrow keys navigate from
+                  // where the user already is. Traversal, the focus highlight
+                  // and Enter activation all come from the framework.
+                  autofocus: settings.theme == theme,
                   leading: Container(
                     width: 32,
                     height: 32,
@@ -809,6 +813,9 @@ class _FontTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      // Opening on the active row lets arrow keys navigate from where the user
+      // already is.
+      autofocus: selected,
       title: Text(label, style: style),
       trailing: selected ? const Icon(Icons.check) : null,
       selected: selected,
