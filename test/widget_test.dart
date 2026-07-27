@@ -364,6 +364,102 @@ void main() {
     });
   });
 
+  group('the editor is typeable again after every sheet closes', () {
+    // Asserting FocusNode.hasFocus would pass even when the editor has no live
+    // input connection, which is the exact failure this guards against. So each
+    // case sends text through the active input client with no widget target and
+    // checks it lands in the editor.
+    String editorText(WidgetTester tester) => tester
+        .widget<TextField>(find.byType(TextField).first)
+        .controller!
+        .text;
+
+    Future<void> expectTypingReachesEditor(WidgetTester tester) async {
+      tester.testTextInput.enterText('typed');
+      await tester.pumpAndSettle();
+      expect(editorText(tester), 'typed');
+    }
+
+    testWidgets('after Escape dismisses the theme sheet', (tester) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.palette_outlined));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      await expectTypingReachesEditor(tester);
+    });
+
+    testWidgets('after choosing a font with Enter', (tester) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      await expectTypingReachesEditor(tester);
+    });
+
+    testWidgets('after cancelling the character limit sheet', (tester) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      await expectTypingReachesEditor(tester);
+    });
+
+    testWidgets('after applying a new character limit', (tester) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '300');
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      await expectTypingReachesEditor(tester);
+    });
+
+    testWidgets('after dismissing the about sheet by tapping the barrier', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      await expectTypingReachesEditor(tester);
+    });
+
+    testWidgets('after a limit reduction confirms the truncation warning', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await tester.enterText(find.byType(TextField).first, 'abcdefghij');
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '5');
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Warning'), findsOneWidget);
+      await tester.tap(find.text('Yes'));
+      await tester.pumpAndSettle();
+
+      // Focus must wait for the warning dialog, not just the sheet.
+      await expectTypingReachesEditor(tester);
+    });
+  });
+
   group('about sheet is readable from the keyboard', () {
     Future<ScrollableState> openAbout(WidgetTester tester) async {
       await tester.tap(find.byIcon(Icons.info_outline));
