@@ -467,12 +467,25 @@ class _MainScreenState extends State<MainScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.4,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, scrollController) => Column(
+      builder: (ctx) => Shortcuts(
+        // Bare arrows map to focus traversal by default, not scrolling. Sending
+        // them to ScrollIntent reuses Flutter's own scrolling, so this reading
+        // sheet responds to arrows as well as the PageUp/PageDown that Flutter
+        // already binds. No scroll maths of our own.
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.arrowDown): ScrollIntent(
+            direction: AxisDirection.down,
+          ),
+          SingleActivator(LogicalKeyboardKey.arrowUp): ScrollIntent(
+            direction: AxisDirection.up,
+          ),
+        },
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) => Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
@@ -500,6 +513,11 @@ class _MainScreenState extends State<MainScreen> {
                 controller: scrollController,
                 padding: const EdgeInsets.all(24),
                 children: [
+                  // ScrollAction finds its Scrollable by looking UP from the
+                  // focused node, so this anchor has to live inside the list. A
+                  // Focus wrapped around the scrollable instead compiles, runs,
+                  // and silently never scrolls.
+                  const Focus(autofocus: true, child: SizedBox.shrink()),
                   _AboutBodyText(
                     'We all carry thoughts we wish we didn\'t. The worries that '
                     'keep us up at night. The harsh things we say to ourselves. '
@@ -601,7 +619,8 @@ class _MainScreenState extends State<MainScreen> {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

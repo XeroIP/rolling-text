@@ -364,6 +364,48 @@ void main() {
     });
   });
 
+  group('about sheet is readable from the keyboard', () {
+    Future<ScrollableState> openAbout(WidgetTester tester) async {
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
+      return tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(BottomSheet),
+              matching: find.byType(Scrollable),
+            )
+            .last,
+      );
+    }
+
+    testWidgets('arrow keys scroll the about text', (tester) async {
+      await _pumpMainScreen(tester);
+      final scrollable = await openAbout(tester);
+      final start = scrollable.position.pixels;
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      final afterDown = scrollable.position.pixels;
+      expect(afterDown, greaterThan(start));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, lessThan(afterDown));
+    });
+
+    testWidgets('page keys scroll the about text further than arrows', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      final scrollable = await openAbout(tester);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+
+      expect(scrollable.position.pixels, greaterThan(0));
+    });
+  });
+
   for (final theme in AppTheme.values) {
     testWidgets('${theme.label} sheets are distinguishable from the editor', (
       tester,
