@@ -424,32 +424,14 @@ class _MainScreenState extends State<MainScreen> {
               ),
               const Divider(height: 1),
               Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  children: [
-                    _FontTile(
-                      label: 'Source Code Pro (Default)',
-                      style: GoogleFonts.getFont('Source Code Pro'),
-                      selected: settings.fontFamily == null,
-                      onTap: () {
-                        settings.setFontFamily(null);
-                        widget.prefsService.saveFontFamily(null);
-                        Navigator.pop(ctx);
-                      },
-                    ),
-                    ...availableFonts.map((family) {
-                      return _FontTile(
-                        label: family,
-                        style: GoogleFonts.getFont(family),
-                        selected: settings.fontFamily == family,
-                        onTap: () {
-                          settings.setFontFamily(family);
-                          widget.prefsService.saveFontFamily(family);
-                          Navigator.pop(ctx);
-                        },
-                      );
-                    }),
-                  ],
+                child: _FontList(
+                  scrollController: scrollController,
+                  selectedFamily: settings.fontFamily,
+                  onSelected: (family) {
+                    settings.setFontFamily(family);
+                    widget.prefsService.saveFontFamily(family);
+                    Navigator.pop(ctx);
+                  },
                 ),
               ),
             ],
@@ -793,6 +775,73 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The scrolling list of fonts.
+///
+/// Stateful so it can reveal the active font when the sheet opens. Rows past
+/// the viewport are built lazily, and a row that is never built can neither be
+/// seen nor take keyboard focus, so a font near the end of the list would
+/// otherwise be invisible and unreachable when its own picker opens.
+class _FontList extends StatefulWidget {
+  final ScrollController scrollController;
+  final String? selectedFamily;
+  final ValueChanged<String?> onSelected;
+
+  const _FontList({
+    required this.scrollController,
+    required this.selectedFamily,
+    required this.onSelected,
+  });
+
+  @override
+  State<_FontList> createState() => _FontListState();
+}
+
+class _FontListState extends State<_FontList> {
+  /// Enforced on the ListView below, so the offset arithmetic in
+  /// [_revealSelection] is exact by construction rather than an assumption
+  /// about how tall a ListTile happens to render.
+  static const double _tileExtent = 56;
+
+  static const List<String?> _options = [null, ...availableFonts];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _revealSelection());
+  }
+
+  void _revealSelection() {
+    final index = _options.indexOf(widget.selectedFamily);
+    if (!mounted || index <= 0) return;
+    final controller = widget.scrollController;
+    if (!controller.hasClients) return;
+    controller.jumpTo(
+      (index * _tileExtent).clamp(
+        controller.position.minScrollExtent,
+        controller.position.maxScrollExtent,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      controller: widget.scrollController,
+      itemExtent: _tileExtent,
+      itemCount: _options.length,
+      itemBuilder: (context, index) {
+        final family = _options[index];
+        return _FontTile(
+          label: family ?? 'Source Code Pro (Default)',
+          style: GoogleFonts.getFont(family ?? 'Source Code Pro'),
+          selected: family == widget.selectedFamily,
+          onTap: () => widget.onSelected(family),
+        );
+      },
     );
   }
 }

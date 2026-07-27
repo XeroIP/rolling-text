@@ -223,9 +223,6 @@ void main() {
       expect(find.text('Select Font'), findsNothing);
     });
 
-    // SKIPPED -- known gap, not a flaky test. The font list always opens at the
-    // top, so a selection past the viewport is never built and cannot take
-    // autofocus. Fixing it needs scroll-to-selection when the sheet opens.
     testWidgets('font sheet reveals an active font far down the list', (
       tester,
     ) async {
@@ -238,7 +235,7 @@ void main() {
 
       expect(_focusedTileLabel(), 'Work Sans');
       expect(find.text('Work Sans'), findsOneWidget);
-    }, skip: true);
+    });
 
     testWidgets('Enter activates the focused control, not the list', (
       tester,
