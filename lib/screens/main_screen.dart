@@ -44,6 +44,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _editorFocusNode = FocusNode();
   final ValueNotifier<int> _charCount = ValueNotifier<int>(0);
   bool _isEnforcing = false;
   String _version = '';
@@ -58,9 +59,73 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    _editorFocusNode.dispose();
     _controller.dispose();
     _charCount.dispose();
     super.dispose();
+  }
+
+  /// Shows a bottom sheet and waits until it has fully gone away.
+  ///
+  /// showModalBottomSheet returns the route's `popped` future, which completes
+  /// while the sheet is still animating out and before the sheet disposes its
+  /// own focus nodes. Restoring editor focus at that point is silently undone
+  /// by the departing sheet -- observed in Chrome with the numeric sheets,
+  /// which own a text field. Awaiting TransitionRoute.completed instead means
+  /// the sheet is really gone before focus is restored.
+  Future<T?> _showSheet<T>({
+    required WidgetBuilder builder,
+    bool isScrollControlled = false,
+  }) async {
+    final navigator = Navigator.of(context);
+    final localizations = MaterialLocalizations.of(context);
+    final route = ModalBottomSheetRoute<T>(
+      builder: builder,
+      isScrollControlled: isScrollControlled,
+      capturedThemes: InheritedTheme.capture(
+        from: context,
+        to: navigator.context,
+      ),
+      barrierLabel: localizations.scrimLabel,
+      barrierOnTapHint: localizations.scrimOnTapHint(
+        localizations.bottomSheetLabel,
+      ),
+    );
+    final result = await navigator.push(route);
+    await route.completed;
+    return result;
+  }
+
+  /// Returns text input to the editor after a sheet closes.
+  ///
+  /// Flutter restores framework focus on its own when a route pops, but on Web
+  /// that is not enough: the editor's FocusNode reports focus while the browser
+  /// is left with no focused input element, so the next keystroke goes nowhere.
+  /// Verified in Chrome against this build -- the hidden textarea Flutter uses
+  /// for text input is focused on load and unfocused after a sheet is
+  /// dismissed, so a bare requestFocus() would be a no-op. Cycling unfocus,
+  /// then a frame, then refocus forces EditableText to re-establish its input
+  /// connection.
+  ///
+  /// Do not simplify this away on the strength of a green test run: widget
+  /// tests cannot observe browser focus and pass either way. Re-check in a real
+  /// browser instead.
+  Future<void> _restoreEditorFocus() async {
+    if (!mounted) return;
+    _editorFocusNode.unfocus();
+    // endOfFrame schedules a frame if none is pending; addPostFrameCallback
+    // does not, and would strand this when the app is idle.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _editorFocusNode.requestFocus();
+
+    // The draggable sheets (Font, About) tear down over one more frame than the
+    // plain ones, and that teardown drops the connection just restored above.
+    // Observed in Chrome: without this second pass, dismissing either of those
+    // two with Escape leaves the editor untypeable while the others are fine.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _editorFocusNode.requestFocus();
   }
 
   void _onTextChanged(String text, AppSettings settings) {
@@ -107,6 +172,7 @@ class _MainScreenState extends State<MainScreen> {
                         label: 'Start typing',
                         child: TextField(
                           controller: _controller,
+                          focusNode: _editorFocusNode,
                           onChanged: (text) => _onTextChanged(text, settings),
                           maxLines: null,
                           expands: true,
@@ -196,8 +262,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _showLimitDialog(BuildContext context, AppSettings settings) async {
-    final newLimit = await showModalBottomSheet<int>(
-      context: context,
+    final newLimit = await _showSheet<int>(
       isScrollControlled: true,
       builder: (ctx) => _NumericSheet(
         title: 'Character Limit',
@@ -209,10 +274,11 @@ class _MainScreenState extends State<MainScreen> {
         colors: colorsFor(settings.theme),
       ),
     );
-    if (newLimit != null) _applyNewLimit(newLimit, settings);
+    if (newLimit != null) await _applyNewLimit(newLimit, settings);
+    await _restoreEditorFocus();
   }
 
-  void _applyNewLimit(int newLimit, AppSettings settings) {
+  Future<void> _applyNewLimit(int newLimit, AppSettings settings) async {
     final currentCount = _controller.text.runes.length;
 
     if (newLimit < currentCount) {
@@ -249,9 +315,8 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _showThemeDialog(BuildContext context, AppSettings settings) {
-    showModalBottomSheet(
-      context: context,
+  Future<void> _showThemeDialog(BuildContext context, AppSettings settings) async {
+    await _showSheet<void>(
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
         return Padding(
@@ -307,11 +372,11 @@ class _MainScreenState extends State<MainScreen> {
         );
       },
     );
+    await _restoreEditorFocus();
   }
 
-  void _showFontDialog(BuildContext context, AppSettings settings) {
-    showModalBottomSheet(
-      context: context,
+  Future<void> _showFontDialog(BuildContext context, AppSettings settings) async {
+    await _showSheet<void>(
       isScrollControlled: true,
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
@@ -359,13 +424,16 @@ class _MainScreenState extends State<MainScreen> {
         );
       },
     );
+    await _restoreEditorFocus();
   }
 
-  void _showFontSizeDialog(BuildContext context, AppSettings settings) {
+  Future<void> _showFontSizeDialog(
+    BuildContext context,
+    AppSettings settings,
+  ) async {
     double currentSize = settings.fontSize;
 
-    showModalBottomSheet(
-      context: context,
+    await _showSheet<void>(
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
         return StatefulBuilder(
@@ -432,17 +500,16 @@ class _MainScreenState extends State<MainScreen> {
           ),
         );
       },
-    ).whenComplete(() {
-      widget.prefsService.saveFontSize(settings.fontSize);
-    });
+    );
+    widget.prefsService.saveFontSize(settings.fontSize);
+    await _restoreEditorFocus();
   }
 
   Future<void> _showCustomFontSizeDialog(
     BuildContext context,
     AppSettings settings,
   ) async {
-    final newSize = await showModalBottomSheet<int>(
-      context: context,
+    final newSize = await _showSheet<int>(
       isScrollControlled: true,
       builder: (ctx) => _NumericSheet(
         title: 'Custom Font Size',
@@ -458,14 +525,14 @@ class _MainScreenState extends State<MainScreen> {
       settings.setFontSize(newSize.toDouble());
       widget.prefsService.saveFontSize(newSize.toDouble());
     }
+    await _restoreEditorFocus();
   }
 
-  void _showAboutSheet(BuildContext context, String version) {
+  Future<void> _showAboutSheet(BuildContext context, String version) async {
     final settings = context.read<AppSettings>();
     final colors = colorsFor(settings.theme);
 
-    showModalBottomSheet(
-      context: context,
+    await _showSheet<void>(
       isScrollControlled: true,
       builder: (ctx) => Shortcuts(
         // Bare arrows map to focus traversal by default, not scrolling. Sending
@@ -624,8 +691,8 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+    await _restoreEditorFocus();
   }
-
 }
 
 /// A bottom sheet that collects one whole number in a range.
