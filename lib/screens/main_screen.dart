@@ -198,12 +198,33 @@ class _MainScreenState extends State<MainScreen> {
   void _showLimitDialog(BuildContext context, AppSettings settings) {
     final inputController =
         TextEditingController(text: '${settings.maxChars}');
+    // Preselect so the first keystroke replaces the current limit rather than
+    // appending to it.
+    inputController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: inputController.text.length,
+    );
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
+
+        void applyLimit() {
+          final value = int.tryParse(inputController.text);
+          if (value == null || value < 1 || value > 1000000) {
+            Navigator.pop(ctx);
+            _showErrorDialog(
+              context,
+              'Please enter a number between 1 and 1,000,000',
+            );
+            return;
+          }
+          Navigator.pop(ctx);
+          _applyNewLimit(value, settings);
+        }
+
         return Padding(
           padding: EdgeInsets.fromLTRB(
             24, 16, 24,
@@ -235,6 +256,8 @@ class _MainScreenState extends State<MainScreen> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => applyLimit(),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
@@ -257,17 +280,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
-                    onPressed: () {
-                      final value = int.tryParse(inputController.text);
-                      if (value == null || value < 1 || value > 1000000) {
-                        Navigator.pop(ctx);
-                        _showErrorDialog(context,
-                            'Please enter a number between 1 and 1,000,000');
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      _applyNewLimit(value, settings);
-                    },
+                    onPressed: applyLimit,
                     child: const Text('Apply'),
                   ),
                 ],
@@ -521,12 +534,34 @@ class _MainScreenState extends State<MainScreen> {
   void _showCustomFontSizeDialog(BuildContext context, AppSettings settings) {
     final inputController =
         TextEditingController(text: '${settings.fontSize.toInt()}');
+    // Preselect so the first keystroke replaces the current size rather than
+    // appending to it.
+    inputController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: inputController.text.length,
+    );
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
+
+        void applyFontSize() {
+          final value = int.tryParse(inputController.text);
+          if (value == null || value < 6 || value > 999) {
+            Navigator.pop(ctx);
+            _showErrorDialog(
+              context,
+              'Please enter a size between 6 and 999 pt',
+            );
+            return;
+          }
+          settings.setFontSize(value.toDouble());
+          widget.prefsService.saveFontSize(value.toDouble());
+          Navigator.pop(ctx);
+        }
+
         return Padding(
           padding: EdgeInsets.fromLTRB(
             24, 16, 24,
@@ -558,6 +593,8 @@ class _MainScreenState extends State<MainScreen> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => applyFontSize(),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 18),
                 decoration: InputDecoration(
@@ -580,18 +617,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
-                    onPressed: () {
-                      final value = int.tryParse(inputController.text);
-                      if (value == null || value < 6 || value > 999) {
-                        Navigator.pop(ctx);
-                        _showErrorDialog(
-                            context, 'Please enter a size between 6 and 999 pt');
-                        return;
-                      }
-                      settings.setFontSize(value.toDouble());
-                      widget.prefsService.saveFontSize(value.toDouble());
-                      Navigator.pop(ctx);
-                    },
+                    onPressed: applyFontSize,
                     child: const Text('Apply'),
                   ),
                 ],

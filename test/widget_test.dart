@@ -49,6 +49,23 @@ Color _sheetSurfaceColor(WidgetTester tester) {
   return material.color!;
 }
 
+AppSettings _settings(WidgetTester tester) => Provider.of<AppSettings>(
+  tester.element(find.byType(MainScreen)),
+  listen: false,
+);
+
+/// The numeric field inside an open sheet. The editor is the first TextField on
+/// screen, so the sheet's own field is the last.
+TextEditingController _sheetInput(WidgetTester tester) =>
+    tester.widgetList<TextField>(find.byType(TextField)).last.controller!;
+
+Future<void> _openCustomFontSize(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.format_size));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Enter custom size…'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('editor renders one app-owned hint until text is entered', (
     tester,
@@ -69,6 +86,65 @@ void main() {
 
     expect(find.text('Start typing…'), findsNothing);
     expect(tester.getSize(find.byType(TextField).first).width, greaterThan(700));
+  });
+
+  group('numeric sheets are usable from the keyboard alone', () {
+    testWidgets('character limit preselects its value so typing replaces it', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+
+      final expected = '${_settings(tester).maxChars}';
+      final input = _sheetInput(tester);
+      expect(input.text, expected);
+      expect(
+        input.selection,
+        TextSelection(baseOffset: 0, extentOffset: expected.length),
+        reason: 'Without a full selection the first keystroke appends to the '
+            'existing limit instead of replacing it',
+      );
+    });
+
+    testWidgets('character limit applies on Enter', (tester) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '200');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Character Limit'), findsNothing);
+      expect(_settings(tester).maxChars, 200);
+    });
+
+    testWidgets('custom font size preselects its value so typing replaces it', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await _openCustomFontSize(tester);
+
+      final input = _sheetInput(tester);
+      expect(
+        input.selection,
+        TextSelection(baseOffset: 0, extentOffset: input.text.length),
+      );
+    });
+
+    testWidgets('custom font size applies on Enter', (tester) async {
+      await _pumpMainScreen(tester);
+      await _openCustomFontSize(tester);
+
+      await tester.enterText(find.byType(TextField).last, '42');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Custom Font Size'), findsNothing);
+      expect(_settings(tester).fontSize, 42);
+    });
   });
 
   for (final theme in AppTheme.values) {
