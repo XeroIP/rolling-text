@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -96,21 +97,28 @@ class _MainScreenState extends State<MainScreen> {
     return result;
   }
 
-  /// Returns text input to the editor after a sheet closes.
+  /// Returns text input to the editor after a sheet closes. Web only.
   ///
-  /// Flutter restores framework focus on its own when a route pops, but on Web
-  /// that is not enough: the editor's FocusNode reports focus while the browser
-  /// is left with no focused input element, so the next keystroke goes nowhere.
-  /// Verified in Chrome against this build -- the hidden textarea Flutter uses
-  /// for text input is focused on load and unfocused after a sheet is
-  /// dismissed, so a bare requestFocus() would be a no-op. Cycling unfocus,
-  /// then a frame, then refocus forces EditableText to re-establish its input
-  /// connection.
+  /// Flutter restores framework focus on its own when a route pops, and on
+  /// native platforms that is sufficient -- ModalRoute hands focus back to the
+  /// editor with a live input connection. On Web it is not enough: the editor's
+  /// FocusNode reports focus while the browser is left with no focused input
+  /// element, so the next keystroke goes nowhere. Verified in Chrome against
+  /// this build -- the hidden textarea Flutter uses for text input is focused
+  /// on load and unfocused after a sheet is dismissed, so a bare requestFocus()
+  /// would be a no-op. Cycling unfocus, then a frame, then refocus forces
+  /// EditableText to re-establish its input connection.
   ///
-  /// Do not simplify this away on the strength of a green test run: widget
-  /// tests cannot observe browser focus and pass either way. Re-check in a real
-  /// browser instead.
+  /// The kIsWeb gate is load-bearing, not a micro-optimisation. Running this on
+  /// Android closes and reopens the software keyboard on every sheet dismissal,
+  /// a visible flicker confirmed on a Pixel 8 Pro release build. Do not remove
+  /// the gate to "simplify" the platform split.
+  ///
+  /// Equally, do not delete the body on the strength of a green test run:
+  /// widget tests run on the native platform, where this no-ops, and cannot
+  /// observe browser focus. Re-check in a real browser instead.
   Future<void> _restoreEditorFocus() async {
+    if (!kIsWeb) return;
     if (!mounted) return;
     _editorFocusNode.unfocus();
     // endOfFrame schedules a frame if none is pending; addPostFrameCallback

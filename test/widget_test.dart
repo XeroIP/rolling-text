@@ -365,6 +365,10 @@ void main() {
   });
 
   group('the editor is typeable again after every sheet closes', () {
+    // These run on the native test platform, where _restoreEditorFocus no-ops
+    // and ModalRoute restores focus by itself. They do not cover the Web fix --
+    // browser focus is only checkable in a real browser.
+    //
     // Asserting FocusNode.hasFocus would pass even when the editor has no live
     // input connection, which is the exact failure this guards against. So each
     // case sends text through the active input client with no widget target and
