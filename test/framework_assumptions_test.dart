@@ -137,6 +137,52 @@ void main() {
     expect(activated, 'Item 1');
   });
 
+  testWidgets('Enter reaches an enclosing CallbackShortcuts even while a field has focus', (
+    tester,
+  ) async {
+    var submitted = 0;
+    var shortcutFired = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.enter): () => shortcutFired++,
+            },
+            child: Column(
+              children: [
+                TextField(autofocus: true, onSubmitted: (_) => submitted++),
+                TextButton(onPressed: () {}, child: const Text('other')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    // The Font Size sheet needs Enter to commit from the slider as well as the
+    // field, so it binds Enter at the sheet level. This pins why that binding
+    // cannot be the *only* Enter path, and why the commit must be re-entrant:
+    //
+    // - A raw Enter reaches the sheet-level binding whatever holds focus, so a
+    //   field-focused Enter can trigger the sheet binding too.
+    // - A raw Enter does NOT fire onSubmitted; that arrives as a platform text
+    //   input action instead (TextInputAction.done), which is the only Enter an
+    //   Android soft keyboard produces. Dropping onSubmitted would break Enter
+    //   on mobile.
+    //
+    // On Web both fire for one keypress, hence the _closing guard on the commit
+    // path. Tests driving the field's own Enter must use
+    // testTextInput.receiveAction, not sendKeyEvent.
+    expect(shortcutFired, 1, reason: 'sheet-level Enter fires regardless of focus');
+    expect(submitted, 0, reason: 'onSubmitted comes from the platform action, not a raw key');
+  });
+
   testWidgets('focus traversal reaches and reveals off-screen tiles', (
     tester,
   ) async {

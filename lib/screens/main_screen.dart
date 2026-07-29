@@ -439,12 +439,16 @@ class _MainScreenState extends State<MainScreen> {
     BuildContext context,
     AppSettings settings,
   ) async {
-    await _showSheet<void>(
+    // The sheet previews sizes live, so a dismissal has to undo the preview.
+    // Only Apply (and the Enter that stands in for it) pops true.
+    final originalSize = settings.fontSize;
+    final applied = await _showSheet<bool>(
       builder: (ctx) => _FontSizeSheet(
         settings: settings,
         colors: colorsFor(settings.theme),
       ),
     );
+    if (applied != true) settings.setFontSize(originalSize);
     widget.prefsService.saveFontSize(settings.fontSize);
     await _restoreEditorFocus();
   }
@@ -455,25 +459,32 @@ class _MainScreenState extends State<MainScreen> {
 
     await _showSheet<void>(
       isScrollControlled: true,
-      builder: (ctx) => Shortcuts(
-        // Bare arrows map to focus traversal by default, not scrolling. Sending
-        // them to ScrollIntent reuses Flutter's own scrolling, so this reading
-        // sheet responds to arrows as well as the PageUp/PageDown that Flutter
-        // already binds. No scroll maths of our own.
-        shortcuts: const <ShortcutActivator, Intent>{
-          SingleActivator(LogicalKeyboardKey.arrowDown): ScrollIntent(
-            direction: AxisDirection.down,
-          ),
-          SingleActivator(LogicalKeyboardKey.arrowUp): ScrollIntent(
-            direction: AxisDirection.up,
-          ),
-        },
-        child: DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          minChildSize: 0.4,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (_, scrollController) => Column(
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) => CallbackShortcuts(
+          // Flutter's own ScrollAction resolves its target by walking UP from
+          // the focused node, so arrows only scroll while something inside the
+          // list holds focus. This list is lazy: an anchor placed in it is
+          // unmounted once scrolled past the cache extent, and the arrows then
+          // die partway down while the mouse wheel keeps working. Driving the
+          // controller costs a little arithmetic but never depends on where
+          // focus sits. The Focus below exists only so key events arrive.
+          bindings: <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.arrowDown):
+                () => _scrollAbout(scrollController, _aboutArrowStep),
+            const SingleActivator(LogicalKeyboardKey.arrowUp):
+                () => _scrollAbout(scrollController, -_aboutArrowStep),
+            const SingleActivator(LogicalKeyboardKey.pageDown):
+                () => _scrollAbout(scrollController, _aboutPageStep(scrollController)),
+            const SingleActivator(LogicalKeyboardKey.pageUp):
+                () => _scrollAbout(scrollController, -_aboutPageStep(scrollController)),
+          },
+          child: Focus(
+            autofocus: true,
+            child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
@@ -501,11 +512,6 @@ class _MainScreenState extends State<MainScreen> {
                 controller: scrollController,
                 padding: const EdgeInsets.all(24),
                 children: [
-                  // ScrollAction finds its Scrollable by looking UP from the
-                  // focused node, so this anchor has to live inside the list. A
-                  // Focus wrapped around the scrollable instead compiles, runs,
-                  // and silently never scrolls.
-                  const Focus(autofocus: true, child: SizedBox.shrink()),
                   _AboutBodyText(
                     'We all carry thoughts we wish we didn\'t. The worries that '
                     'keep us up at night. The harsh things we say to ourselves. '
@@ -609,10 +615,33 @@ class _MainScreenState extends State<MainScreen> {
             ),
             ],
           ),
+          ),
         ),
       ),
     );
     await _restoreEditorFocus();
+  }
+
+  /// One arrow press worth of About-sheet scrolling, in logical pixels.
+  static const double _aboutArrowStep = 80;
+
+  /// One page press worth, scaled to whatever the sheet is currently showing so
+  /// it always outruns an arrow press.
+  double _aboutPageStep(ScrollController controller) =>
+      controller.hasClients ? controller.position.viewportDimension * 0.8 : 0;
+
+  /// Scrolls the About sheet by [delta], clamped to the content.
+  void _scrollAbout(ScrollController controller, double delta) {
+    if (!controller.hasClients) return;
+    final position = controller.position;
+    controller.animateTo(
+      (position.pixels + delta).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+    );
   }
 }
 
@@ -648,6 +677,7 @@ class _NumericSheet extends StatefulWidget {
 class _NumericSheetState extends State<_NumericSheet> {
   late final TextEditingController _controller;
   final FocusNode _focusNode = FocusNode();
+  String? _error;
 
   @override
   void initState() {
@@ -672,30 +702,18 @@ class _NumericSheetState extends State<_NumericSheet> {
     );
   }
 
-  Future<void> _apply() async {
+  void _apply() {
     final value = int.tryParse(_controller.text);
     if (value == null || value < widget.minValue || value > widget.maxValue) {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Invalid Input'),
-          content: Text(widget.errorMessage),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
       // The sheet deliberately stays open: closing it would discard the value
-      // the user has just been asked to correct.
-      if (!mounted) return;
+      // the user has just been asked to correct. The message is inline rather
+      // than a dialog so it matches the Font Size sheet and costs no keypress
+      // to dismiss.
+      setState(() => _error = widget.errorMessage);
       _focusNode.requestFocus();
       _selectAll();
       return;
     }
-    if (!mounted) return;
     Navigator.pop(context, value);
   }
 
@@ -735,11 +753,15 @@ class _NumericSheetState extends State<_NumericSheet> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             autofocus: true,
             textInputAction: TextInputAction.done,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
             onSubmitted: (_) => _apply(),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 18),
             decoration: InputDecoration(
               hintText: widget.hintText,
+              errorText: _error,
               filled: true,
               fillColor: colors.buttonBackground,
               border: OutlineInputBorder(
@@ -789,6 +811,12 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
   final FocusNode _focusNode = FocusNode();
   String? _error;
 
+  /// One Enter can arrive twice -- once as a raw key event through the
+  /// sheet-level binding, once as a platform text input action through
+  /// onSubmitted. See framework_assumptions_test.dart. Without this the second
+  /// pop would dismiss whatever route is behind the sheet.
+  bool _closing = false;
+
   @override
   void initState() {
     super.initState();
@@ -830,16 +858,20 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
     }
   }
 
-  void _onFieldSubmitted(String text) {
-    final value = int.tryParse(text);
+  /// Commits the sheet. Reachable from Apply, from the field's own Enter, and
+  /// from the sheet-level Enter binding (which is how the slider commits).
+  void _apply() {
+    if (_closing) return;
+    final value = int.tryParse(_controller.text);
     if (value == null || value < 6 || value > 999) {
       setState(() => _error = 'Enter a size between 6 and 999 pt');
       _focusNode.requestFocus();
       _selectAll();
       return;
     }
-    // The value was already applied live by _onFieldChanged.
-    Navigator.pop(context);
+    // The value was already applied live by _onFieldChanged or _onSliderChanged.
+    _closing = true;
+    Navigator.pop(context, true);
   }
 
   void _onSliderChanged(double value) {
@@ -856,7 +888,15 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = widget.colors;
-    return Padding(
+    return CallbackShortcuts(
+      // The slider owns focus after a drag and ignores Enter, so without a
+      // sheet-level binding there is no way to commit from the keyboard once
+      // you have touched it.
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.enter): _apply,
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): _apply,
+      },
+      child: Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -887,7 +927,7 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
             autofocus: true,
             textInputAction: TextInputAction.done,
             onChanged: _onFieldChanged,
-            onSubmitted: _onFieldSubmitted,
+            onSubmitted: (_) => _apply(),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 24,
@@ -921,7 +961,20 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
               Text('144pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
             ],
           ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: _apply, child: const Text('Apply')),
+            ],
+          ),
         ],
+      ),
       ),
     );
   }

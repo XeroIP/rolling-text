@@ -193,6 +193,70 @@ void main() {
         reason: 'One Tab from the autofocused field should reach the slider',
       );
     });
+
+    testWidgets('Enter commits the font size while the slider holds focus', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await _openFontSize(tester);
+
+      await tester.enterText(find.byType(TextField).last, '42');
+      await tester.pump();
+      // Tab to the slider: it ignores Enter itself, so without a sheet-level
+      // binding there is no keyboard way to commit after touching it.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Font Size'), findsNothing);
+      expect(_settings(tester).fontSize, 42);
+    });
+
+    testWidgets('Apply commits the font size', (tester) async {
+      await _pumpMainScreen(tester);
+      await _openFontSize(tester);
+
+      await tester.enterText(find.byType(TextField).last, '42');
+      await tester.pump();
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Font Size'), findsNothing);
+      expect(_settings(tester).fontSize, 42);
+    });
+
+    testWidgets('Cancel reverts the previewed font size', (tester) async {
+      await _pumpMainScreen(tester);
+      final before = _settings(tester).fontSize;
+      await _openFontSize(tester);
+
+      await tester.enterText(find.byType(TextField).last, '42');
+      await tester.pump();
+      expect(
+        _settings(tester).fontSize,
+        42,
+        reason: 'the size previews live while the sheet is open',
+      );
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(_settings(tester).fontSize, before);
+    });
+
+    testWidgets('Escape reverts the previewed font size', (tester) async {
+      await _pumpMainScreen(tester);
+      final before = _settings(tester).fontSize;
+      await _openFontSize(tester);
+
+      await tester.enterText(find.byType(TextField).last, '42');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(_settings(tester).fontSize, before);
+    });
   });
 
   group('numeric sheets only commit valid values', () {
@@ -208,10 +272,12 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
 
-      expect(find.text('Invalid Input'), findsOneWidget);
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
+      expect(
+        find.text('Please enter a number between 1 and 1,000,000'),
+        findsOneWidget,
+        reason: 'the error is inline, matching the Font Size sheet',
+      );
+      expect(find.text('Invalid Input'), findsNothing, reason: 'no dialog');
       expect(
         find.text('Character Limit'),
         findsOneWidget,
@@ -231,8 +297,6 @@ void main() {
       await tester.enterText(find.byType(TextField).last, '0');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
 
       expect(
         _sheetInput(tester).selection,
@@ -248,8 +312,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, '0');
       await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).last, '300');
@@ -530,6 +592,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(scrollable.position.pixels, greaterThan(0));
+    });
+
+    testWidgets('arrow keys reach the very bottom of the about text', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      final scrollable = await openAbout(tester);
+
+      // The previous implementation anchored focus inside the lazy ListView.
+      // Once that anchor scrolled past the cache extent it was unmounted,
+      // ScrollAction lost the Scrollable it resolves from the focused node, and
+      // the arrows died partway down -- while the mouse wheel still worked.
+      // Two presses stayed inside the cache extent, so the old tests passed.
+      var lastPixels = scrollable.position.pixels;
+      var stalledFor = 0;
+      for (var i = 0; i < 200; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pumpAndSettle();
+        final pixels = scrollable.position.pixels;
+        stalledFor = pixels > lastPixels ? 0 : stalledFor + 1;
+        lastPixels = pixels;
+        if (stalledFor > 2) break;
+      }
+
+      expect(
+        lastPixels,
+        moreOrLessEquals(scrollable.position.maxScrollExtent, epsilon: 1),
+        reason: 'arrows must reach the end of the content, not stall partway',
+      );
+      expect(scrollable.position.maxScrollExtent, greaterThan(0));
     });
   });
 
