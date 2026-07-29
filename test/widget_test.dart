@@ -79,10 +79,8 @@ String? _focusedTileLabel() {
   return title is Text ? title.data : null;
 }
 
-Future<void> _openCustomFontSize(WidgetTester tester) async {
+Future<void> _openFontSize(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.format_size));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Enter custom size…'));
   await tester.pumpAndSettle();
 }
 
@@ -141,11 +139,11 @@ void main() {
       expect(_settings(tester).maxChars, 200);
     });
 
-    testWidgets('custom font size preselects its value so typing replaces it', (
+    testWidgets('font size preselects its value so typing replaces it', (
       tester,
     ) async {
       await _pumpMainScreen(tester);
-      await _openCustomFontSize(tester);
+      await _openFontSize(tester);
 
       final input = _sheetInput(tester);
       expect(
@@ -154,16 +152,46 @@ void main() {
       );
     });
 
-    testWidgets('custom font size applies on Enter', (tester) async {
+    testWidgets('font size applies on Enter', (tester) async {
       await _pumpMainScreen(tester);
-      await _openCustomFontSize(tester);
+      await _openFontSize(tester);
 
       await tester.enterText(find.byType(TextField).last, '42');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
 
-      expect(find.text('Custom Font Size'), findsNothing);
+      expect(find.text('Font Size'), findsNothing);
       expect(_settings(tester).fontSize, 42);
+    });
+
+    testWidgets('font size applies live while typing, before Enter', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await _openFontSize(tester);
+
+      await tester.enterText(find.byType(TextField).last, '42');
+      await tester.pump();
+
+      expect(find.text('Font Size'), findsOneWidget);
+      expect(_settings(tester).fontSize, 42);
+    });
+
+    testWidgets('the slider is one Tab away from the font size field', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await _openFontSize(tester);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+
+      final focused = FocusManager.instance.primaryFocus;
+      expect(
+        focused?.context?.findAncestorWidgetOfExactType<Slider>(),
+        isNotNull,
+        reason: 'One Tab from the autofocused field should reach the slider',
+      );
     });
   });
 
@@ -245,20 +273,19 @@ void main() {
       expect(_settings(tester).maxChars, before);
     });
 
-    testWidgets('an invalid font size keeps the sheet open', (tester) async {
+    testWidgets('an invalid font size keeps the sheet open with an inline error', (
+      tester,
+    ) async {
       await _pumpMainScreen(tester);
       final before = _settings(tester).fontSize;
 
-      await _openCustomFontSize(tester);
+      await _openFontSize(tester);
       await tester.enterText(find.byType(TextField).last, '3');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
 
-      expect(find.text('Invalid Input'), findsOneWidget);
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Custom Font Size'), findsOneWidget);
+      expect(find.text('Font Size'), findsOneWidget);
+      expect(find.text('Enter a size between 6 and 999 pt'), findsOneWidget);
       expect(_settings(tester).fontSize, before);
     });
   });

@@ -439,100 +439,13 @@ class _MainScreenState extends State<MainScreen> {
     BuildContext context,
     AppSettings settings,
   ) async {
-    double currentSize = settings.fontSize;
-
     await _showSheet<void>(
-      builder: (ctx) {
-        final colors = colorsFor(settings.theme);
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) => Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Font Size',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: colors.text,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '${currentSize.round()}pt',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: colors.text,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Slider(
-                  value: currentSize.clamp(6, 144),
-                  min: 6,
-                  max: 144,
-                  divisions: 138,
-                  label: '${currentSize.round()}pt',
-                  onChanged: (value) {
-                    setSheetState(() => currentSize = value.roundToDouble());
-                    settings.setFontSize(currentSize);
-                  },
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('6pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
-                    Text('144pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showCustomFontSizeDialog(context, settings);
-                  },
-                  child: const Text('Enter custom size\u2026'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    widget.prefsService.saveFontSize(settings.fontSize);
-    await _restoreEditorFocus();
-  }
-
-  Future<void> _showCustomFontSizeDialog(
-    BuildContext context,
-    AppSettings settings,
-  ) async {
-    final newSize = await _showSheet<int>(
-      isScrollControlled: true,
-      builder: (ctx) => _NumericSheet(
-        title: 'Custom Font Size',
-        hintText: '6 – 999',
-        initialValue: settings.fontSize.toInt(),
-        minValue: 6,
-        maxValue: 999,
-        errorMessage: 'Please enter a size between 6 and 999 pt',
+      builder: (ctx) => _FontSizeSheet(
+        settings: settings,
         colors: colorsFor(settings.theme),
       ),
     );
-    if (newSize != null) {
-      settings.setFontSize(newSize.toDouble());
-      widget.prefsService.saveFontSize(newSize.toDouble());
-    }
+    widget.prefsService.saveFontSize(settings.fontSize);
     await _restoreEditorFocus();
   }
 
@@ -845,6 +758,167 @@ class _NumericSheetState extends State<_NumericSheet> {
               ),
               const SizedBox(width: 8),
               FilledButton(onPressed: _apply, child: const Text('Apply')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The Font Size sheet: a numeric field and a slider that both edit the same
+/// value live, kept in sync with each other.
+///
+/// The field is autofocused with its value preselected, so the sheet is
+/// typeable the instant it opens -- no button, no second sheet to reach a
+/// keyboard. Field precedes the slider in the widget tree, so a single Tab
+/// from the field reaches the slider.
+class _FontSizeSheet extends StatefulWidget {
+  final AppSettings settings;
+  final AppColors colors;
+
+  const _FontSizeSheet({required this.settings, required this.colors});
+
+  @override
+  State<_FontSizeSheet> createState() => _FontSizeSheetState();
+}
+
+class _FontSizeSheetState extends State<_FontSizeSheet> {
+  late double _size;
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _size = widget.settings.fontSize;
+    _controller = TextEditingController(text: '${_size.round()}');
+    _selectAll();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  /// Selects the whole value so the next keystroke replaces it rather than
+  /// appending to it.
+  void _selectAll() {
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
+  // Applies a valid value immediately, matching the slider. An invalid or
+  // incomplete value (e.g. "" while backspacing) is left un-applied and
+  // silent -- flashing an error on every keystroke would fight the user
+  // typing a number one digit at a time.
+  void _onFieldChanged(String text) {
+    final value = int.tryParse(text);
+    if (value != null && value >= 6 && value <= 999) {
+      setState(() {
+        _error = null;
+        _size = value.toDouble();
+      });
+      widget.settings.setFontSize(_size);
+    } else if (_error != null) {
+      setState(() => _error = null);
+    }
+  }
+
+  void _onFieldSubmitted(String text) {
+    final value = int.tryParse(text);
+    if (value == null || value < 6 || value > 999) {
+      setState(() => _error = 'Enter a size between 6 and 999 pt');
+      _focusNode.requestFocus();
+      _selectAll();
+      return;
+    }
+    // The value was already applied live by _onFieldChanged.
+    Navigator.pop(context);
+  }
+
+  void _onSliderChanged(double value) {
+    final rounded = value.roundToDouble();
+    setState(() {
+      _error = null;
+      _size = rounded;
+      _controller.text = '${rounded.round()}';
+      _selectAll();
+    });
+    widget.settings.setFontSize(rounded);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Font Size',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colors.text,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onChanged: _onFieldChanged,
+            onSubmitted: _onFieldSubmitted,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: colors.text,
+            ),
+            decoration: InputDecoration(
+              suffixText: 'pt',
+              errorText: _error,
+              filled: true,
+              fillColor: colors.buttonBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Slider(
+            value: _size.clamp(6, 144),
+            min: 6,
+            max: 144,
+            divisions: 138,
+            label: '${_size.round()}pt',
+            onChanged: _onSliderChanged,
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('6pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+              Text('144pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
             ],
           ),
         ],
