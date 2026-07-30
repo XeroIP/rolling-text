@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-30
+
 ### Changed
 - **Typed text is no longer offered to the Android keyboard** - The editor opts out of IME personalized learning, so what you type is not added to your keyboard's dictionary or typing history
 
@@ -16,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editor stopped accepting keystrokes after tapping empty space or leaving the window** - Tapping away from the editor or switching to another window and back left typing dead until the page was reloaded
 - **Corrupt or out-of-range saved settings could crash the app on launch** - Settings are now validated when they load, and anything invalid falls back to its default instead of throwing
 - **A setting that failed to save appeared to have been saved** - A failed write now warns that the change will not be remembered, rather than silently leaving the app and storage disagreeing
+
+### Known Issues
+- **iOS is untested on hardware** - It takes the same code path as Android, which was verified on a Pixel 8 Pro
+
+---
 
 ## [0.5.0] - 2026-07-30
 
