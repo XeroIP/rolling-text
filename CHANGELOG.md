@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Typed text is no longer offered to the Android keyboard** - The editor opts out of IME personalized learning, so what you type is not added to your keyboard's dictionary or typing history
+
+### Fixed
+- **Editor stopped accepting keystrokes after tapping empty space or leaving the window** - Tapping away from the editor or switching to another window and back left typing dead until the page was reloaded
+
 ## [0.5.0] - 2026-07-30
 
 ### Keyboard Accessibility Release
