@@ -579,9 +579,7 @@ void main() {
       await expectTypingReachesEditor(tester);
     });
 
-    testWidgets('after a limit reduction confirms the truncation warning', (
-      tester,
-    ) async {
+    testWidgets('after a limit reduction truncates the text', (tester) async {
       await _pumpMainScreen(tester);
       await tester.enterText(find.byType(TextField).first, 'abcdefghij');
       await tester.pump();
@@ -592,11 +590,19 @@ void main() {
       await tester.tap(find.text('Apply'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Warning'), findsOneWidget);
-      await tester.tap(find.text('Yes'));
-      await tester.pumpAndSettle();
+      expect(
+        find.text('Warning'),
+        findsNothing,
+        reason: 'a lower limit applies without asking for confirmation',
+      );
+      expect(find.text('Character Limit'), findsNothing);
+      expect(_settings(tester).maxChars, 5);
+      expect(
+        editorText(tester),
+        'fghij',
+        reason: 'truncation drops the oldest characters, not the newest',
+      );
 
-      // Focus must wait for the warning dialog, not just the sheet.
       await expectTypingReachesEditor(tester);
     });
   });

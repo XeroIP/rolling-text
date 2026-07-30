@@ -282,45 +282,20 @@ class _MainScreenState extends State<MainScreen> {
         colors: colorsFor(settings.theme),
       ),
     );
-    if (newLimit != null) await _applyNewLimit(newLimit, settings);
+    if (newLimit != null) _applyNewLimit(newLimit, settings);
     await _restoreEditorFocus();
   }
 
-  Future<void> _applyNewLimit(int newLimit, AppSettings settings) async {
-    final currentCount = _controller.text.runes.length;
-
-    if (newLimit < currentCount) {
-      final charsToRemove = currentCount - newLimit;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Warning'),
-          content: Text(
-            'This will remove $charsToRemove '
-            '${charsToRemove == 1 ? "character" : "characters"} '
-            'from the beginning of your text. Continue?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('No'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                settings.setMaxChars(newLimit);
-                widget.prefsService.saveMaxChars(newLimit);
-                _onTextChanged(_controller.text, settings);
-              },
-              child: const Text('Yes'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      settings.setMaxChars(newLimit);
-      widget.prefsService.saveMaxChars(newLimit);
-    }
+  /// Applies a new limit, shortening the text if it no longer fits.
+  ///
+  /// A lower limit takes effect without confirmation: this editor exists to make
+  /// text disappear, so asking permission to shorten it works against the point.
+  /// _onTextChanged truncates when the text is over the limit and does nothing
+  /// when it is not, so one call covers both cases.
+  void _applyNewLimit(int newLimit, AppSettings settings) {
+    settings.setMaxChars(newLimit);
+    widget.prefsService.saveMaxChars(newLimit);
+    _onTextChanged(_controller.text, settings);
   }
 
   Future<void> _showThemeDialog(BuildContext context, AppSettings settings) async {
