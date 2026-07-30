@@ -9,6 +9,27 @@ import 'package:rolling_text/screens/main_screen.dart';
 import 'package:rolling_text/services/preferences_service.dart';
 import 'package:rolling_text/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// shared_preferences_platform_interface is a transitive dependency of
+// shared_preferences, not a direct one -- pulled in here only to fake a
+// failing write for #24's tests, not added as a project dependency.
+// ignore: depend_on_referenced_packages
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
+
+/// A store whose writes all fail, for exercising #24's failure path.
+///
+/// Reads still work normally (backed by [InMemorySharedPreferencesStore]) so
+/// the app loads its usual defaults; only [setValue] and [remove] report
+/// failure, matching what a real disk-full or permission error looks like to
+/// the SharedPreferences API -- a `false` result, not a thrown exception.
+class _FailingSharedPreferencesStore extends InMemorySharedPreferencesStore {
+  _FailingSharedPreferencesStore.empty() : super.empty();
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) async => false;
+
+  @override
+  Future<bool> remove(String key) async => false;
+}
 
 /// Pumps the app the way [RollingTextApp] does, including the real
 /// [themeDataFor] theme. Tests that pump a bare MaterialApp silently get
@@ -17,8 +38,17 @@ Future<void> _pumpMainScreen(
   WidgetTester tester, {
   AppTheme theme = AppTheme.light,
   String? fontFamily,
+  bool failWrites = false,
 }) async {
-  SharedPreferences.setMockInitialValues({});
+  if (failWrites) {
+    // setMockInitialValues always installs a plain InMemorySharedPreferencesStore,
+    // so a failing store has to be wired in the same way it does internally,
+    // then SharedPreferences.getInstance() re-read against it.
+    SharedPreferencesStorePlatform.instance = _FailingSharedPreferencesStore.empty();
+    SharedPreferences.resetStatic();
+  } else {
+    SharedPreferences.setMockInitialValues({});
+  }
   PackageInfo.setMockInitialValues(
     appName: 'Rolling Text',
     packageName: 'io.rollingtext.rolling_text',
@@ -719,6 +749,38 @@ void main() {
         reason: 'arrows must reach the end of the content, not stall partway',
       );
       expect(scrollable.position.maxScrollExtent, greaterThan(0));
+    });
+  });
+
+  group('preference writes are surfaced and reconciled', () {
+    testWidgets('a failed save keeps the change applied and warns it will not be remembered', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester, failWrites: true);
+      expect(_settings(tester).theme, AppTheme.light);
+
+      await tester.tap(find.byIcon(Icons.palette_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dark'));
+      await tester.pumpAndSettle();
+
+      // The setting stays applied for the session even though it could not be
+      // saved -- fighting the UI back to its old value would be a worse
+      // experience than one that silently does not survive to next launch.
+      expect(_settings(tester).theme, AppTheme.dark);
+      expect(find.text("This change won't be remembered"), findsOneWidget);
+    });
+
+    testWidgets('a successful save shows no warning', (tester) async {
+      await _pumpMainScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.palette_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dark'));
+      await tester.pumpAndSettle();
+
+      expect(_settings(tester).theme, AppTheme.dark);
+      expect(find.text("This change won't be remembered"), findsNothing);
     });
   });
 
