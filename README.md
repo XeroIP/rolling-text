@@ -59,6 +59,9 @@ Try it in your browser at https://xeroip.github.io/rolling-text/
 
 ### Run from source
 
+Requires Flutter 3.44.8. CI is pinned to this version; a different local Flutter will
+resolve `pubspec.lock` differently and rewrite it on `flutter pub get`.
+
 1. Clone the repository:
 
     ```bash
