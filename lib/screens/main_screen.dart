@@ -327,7 +327,8 @@ class _MainScreenState extends State<MainScreen> {
     await _showSheet<void>(
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
-        return Padding(
+        return _SheetInitialFocus(
+          builder: (rowFocusNode) => Padding(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -355,8 +356,9 @@ class _MainScreenState extends State<MainScreen> {
                 return ListTile(
                   // Opening on the active row lets arrow keys navigate from
                   // where the user already is. Traversal, the focus highlight
-                  // and Enter activation all come from the framework.
-                  autofocus: settings.theme == theme,
+                  // and Enter activation all come from the framework; only the
+                  // initial claim is ours -- see _SheetInitialFocus.
+                  focusNode: settings.theme == theme ? rowFocusNode : null,
                   leading: Container(
                     width: 32,
                     height: 32,
@@ -376,6 +378,7 @@ class _MainScreenState extends State<MainScreen> {
                 );
               }),
             ],
+          ),
           ),
         );
       },
@@ -643,6 +646,52 @@ class _MainScreenState extends State<MainScreen> {
       curve: Curves.easeOut,
     );
   }
+}
+
+/// Owns a [FocusNode] for the row a sheet should open on, and claims focus for
+/// it once the sheet has built.
+///
+/// ListTile.autofocus is not enough on Web. It registers the right node -- a
+/// single Tab lands on exactly the row autofocus named -- but it depends on the
+/// modal route's FocusScope taking focus when the route is pushed, and that does
+/// not happen in a browser. Verified in Chrome against this build: with the
+/// Theme sheet fully open, document.activeElement was still the *toolbar
+/// button* that opened it, outside the sheet's route. Arrows therefore traversed
+/// the toolbar behind the barrier and Enter re-fired a toolbar button, which
+/// reads to the user as the keyboard doing nothing at all. Requesting focus on a
+/// real node after the frame does not wait for the scope to claim anything.
+///
+/// Widget tests cannot catch this: the test binding pushes focus into the route
+/// scope, and the Theme sheet's test only ever runs with the default theme,
+/// whose row is first in the list either way.
+class _SheetInitialFocus extends StatefulWidget {
+  final Widget Function(FocusNode rowFocusNode) builder;
+
+  const _SheetInitialFocus({required this.builder});
+
+  @override
+  State<_SheetInitialFocus> createState() => _SheetInitialFocusState();
+}
+
+class _SheetInitialFocusState extends State<_SheetInitialFocus> {
+  final FocusNode _rowFocusNode = FocusNode(debugLabel: 'sheet initial row');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _rowFocusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _rowFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_rowFocusNode);
 }
 
 /// A bottom sheet that collects one whole number in a range.
@@ -1009,10 +1058,25 @@ class _FontListState extends State<_FontList> {
 
   static const List<String?> _options = [null, ...availableFonts];
 
+  final FocusNode _selectedNode = FocusNode(debugLabel: 'selected font');
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _revealSelection());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _revealSelection();
+      // The jump above changes which rows exist, so the selected row is only
+      // built on the frame after it. Requesting focus any earlier targets a node
+      // with no context. See _SheetInitialFocus for why autofocus is not enough.
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) _selectedNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _selectedNode.dispose();
+    super.dispose();
   }
 
   void _revealSelection() {
@@ -1036,10 +1100,12 @@ class _FontListState extends State<_FontList> {
       itemCount: _options.length,
       itemBuilder: (context, index) {
         final family = _options[index];
+        final selected = family == widget.selectedFamily;
         return _FontTile(
           label: family ?? 'Source Code Pro (Default)',
           style: GoogleFonts.getFont(family ?? 'Source Code Pro'),
-          selected: family == widget.selectedFamily,
+          selected: selected,
+          focusNode: selected ? _selectedNode : null,
           onTap: () => widget.onSelected(family),
         );
       },
@@ -1051,12 +1117,14 @@ class _FontTile extends StatelessWidget {
   final String label;
   final TextStyle style;
   final bool selected;
+  final FocusNode? focusNode;
   final VoidCallback onTap;
 
   const _FontTile({
     required this.label,
     required this.style,
     required this.selected,
+    required this.focusNode,
     required this.onTap,
   });
 
@@ -1064,8 +1132,9 @@ class _FontTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       // Opening on the active row lets arrow keys navigate from where the user
-      // already is.
-      autofocus: selected,
+      // already is. The initial focus claim is explicit rather than autofocus --
+      // see _SheetInitialFocus.
+      focusNode: focusNode,
       title: Text(label, style: style),
       trailing: selected ? const Icon(Icons.check) : null,
       selected: selected,
