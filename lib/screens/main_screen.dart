@@ -49,6 +49,7 @@ class _MainScreenState extends State<MainScreen> {
   final ValueNotifier<int> _charCount = ValueNotifier<int>(0);
   bool _isEnforcing = false;
   String _version = '';
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
@@ -56,10 +57,19 @@ class _MainScreenState extends State<MainScreen> {
     PackageInfo.fromPlatform().then((info) {
       setState(() => _version = info.version);
     });
+    // Returning to the app (another window regains focus, or the OS resumes
+    // the app on mobile) does not by itself give the editor focus back. Left
+    // alone, that reproduces the same dead-input state as #29's tap-outside
+    // case: the FocusNode can still report focused while nothing is actually
+    // listening for keystrokes.
+    _lifecycleListener = AppLifecycleListener(
+      onResume: () => _editorFocusNode.requestFocus(),
+    );
   }
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     _editorFocusNode.dispose();
     _controller.dispose();
     _charCount.dispose();
@@ -182,6 +192,21 @@ class _MainScreenState extends State<MainScreen> {
                           controller: _controller,
                           focusNode: _editorFocusNode,
                           onChanged: (text) => _onTextChanged(text, settings),
+                          // The default TapRegion behaviour unfocuses the field
+                          // on an outside tap. That is #29: nothing ever
+                          // requests focus again afterward, so typing goes
+                          // nowhere until the page reloads. Re-requesting focus
+                          // here instead keeps the editor the permanent target
+                          // for keystrokes, which matches an app with no other
+                          // text input to tap into.
+                          onTapOutside: (_) => _editorFocusNode.requestFocus(),
+                          // "Nothing is saved. Nothing is stored" is the whole
+                          // premise of this app; leaving IME personalized
+                          // learning on would let the keyboard itself add typed
+                          // text to its dictionary and suggestion history. This
+                          // opts out of that without touching autocorrect or
+                          // suggestions, which are a separate decision.
+                          enableIMEPersonalizedLearning: false,
                           maxLines: null,
                           expands: true,
                           textAlignVertical: TextAlignVertical.top,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -105,6 +106,48 @@ void main() {
     expect(find.text('Start typing…'), findsNothing);
     expect(tester.getSize(find.byType(TextField).first).width, greaterThan(700));
   });
+
+  testWidgets('the editor opts out of IME personalized learning', (tester) async {
+    await _pumpMainScreen(tester);
+
+    final editor = tester.widget<TextField>(find.byType(TextField).first);
+    expect(editor.enableIMEPersonalizedLearning, isFalse);
+  });
+
+  testWidgets(
+    'tapping outside the editor on desktop keeps it focused and typeable',
+    (tester) async {
+      // The framework's own default here unfocuses the field -- see
+      // framework_assumptions_test.dart. This proves main_screen.dart's
+      // onTapOutside override replaces that default rather than merely
+      // supplementing it.
+      //
+      // Reset before the test ends, not via addTearDown: flutter_test checks
+      // this debug variable is back to its original value immediately after
+      // the test body returns, which runs before addTearDown callbacks fire.
+      try {
+        debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+
+        await _pumpMainScreen(tester);
+        final editor = find.byType(TextField).first;
+        final focusNode = tester.widget<TextField>(editor).focusNode!;
+        expect(focusNode.hasFocus, isTrue);
+
+        // A point inside the Scaffold's padding band, outside the editor's
+        // own bounds and off every toolbar button.
+        await tester.tapAt(const Offset(5, 5));
+        await tester.pumpAndSettle();
+
+        expect(focusNode.hasFocus, isTrue);
+
+        await tester.enterText(editor, 'still typeable');
+        await tester.pump();
+        expect(find.text('still typeable'), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   group('numeric sheets are usable from the keyboard alone', () {
     testWidgets('character limit preselects its value so typing replaces it', (

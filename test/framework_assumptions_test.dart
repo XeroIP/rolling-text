@@ -11,7 +11,8 @@
 // Flutter upgrade, the fix is to add the corresponding behaviour back to
 // main_screen.dart -- not to delete the test.
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -211,6 +212,49 @@ void main() {
     expect(shortcutFired, 1, reason: 'sheet-level Enter fires regardless of focus');
     expect(submitted, 0, reason: 'onSubmitted comes from the platform action, not a raw key');
   });
+
+  testWidgets(
+    'a bare TextField unfocuses itself on an outside tap on desktop platforms',
+    (tester) async {
+      // This is the framework default #29's fix works around: EditableText's
+      // built-in TapRegion unfocuses on an outside tap on desktop platforms
+      // (and, separately, on Web) unless onTapOutside is overridden. The
+      // editor in main_screen.dart supplies its own onTapOutside specifically
+      // to prevent this. If a future SDK stops unfocusing here by default,
+      // that override becomes redundant -- but harmless, so prefer leaving it
+      // rather than deleting this test.
+      // Reset before the test ends, not via addTearDown: flutter_test checks
+      // this debug variable is back to its original value immediately after
+      // the test body returns, which runs before addTearDown callbacks fire.
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+      try {
+        debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  TextField(focusNode: focusNode, autofocus: true),
+                  const SizedBox(height: 200, child: Text('elsewhere')),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(focusNode.hasFocus, isTrue);
+
+        await tester.tap(find.text('elsewhere'));
+        await tester.pumpAndSettle();
+
+        expect(focusNode.hasFocus, isFalse);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   testWidgets('focus traversal reaches and reveals off-screen tiles', (
     tester,
