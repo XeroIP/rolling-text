@@ -9,31 +9,6 @@ import '../services/preferences_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/text_truncation.dart';
 
-
-/// Curated list of 20 Google Fonts, sorted alphabetically.
-const List<String> availableFonts = [
-  'Courier Prime',
-  'Crimson Text',
-  'EB Garamond',
-  'Fira Code',
-  'IBM Plex Mono',
-  'Inconsolata',
-  'Inter',
-  'JetBrains Mono',
-  'Karla',
-  'Lato',
-  'Libre Baskerville',
-  'Lora',
-  'Merriweather',
-  'Nunito',
-  'Open Sans',
-  'Playfair Display',
-  'PT Serif',
-  'Raleway',
-  'Source Code Pro',
-  'Work Sans',
-];
-
 class MainScreen extends StatefulWidget {
   final PreferencesService prefsService;
 
@@ -294,6 +269,21 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Awaits a preference write and warns if it silently failed.
+  ///
+  /// The setting stays applied for this session either way -- reverting the
+  /// UI back to its old value on a storage failure would be a worse
+  /// experience than a value that just does not survive to the next launch.
+  /// PreferencesService's save methods report success or failure instead of
+  /// being fire-and-forget specifically so this can tell the difference.
+  Future<void> _persist(Future<bool> Function() save, BuildContext context) async {
+    final saved = await save();
+    if (saved || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("This change won't be remembered")),
+    );
+  }
+
   Future<void> _showLimitDialog(BuildContext context, AppSettings settings) async {
     final newLimit = await _showSheet<int>(
       isScrollControlled: true,
@@ -301,13 +291,14 @@ class _MainScreenState extends State<MainScreen> {
         title: 'Character Limit',
         hintText: '1 – 1,000,000',
         initialValue: settings.maxChars,
-        minValue: 1,
-        maxValue: 1000000,
+        minValue: minMaxChars,
+        maxValue: maxMaxChars,
         errorMessage: 'Please enter a number between 1 and 1,000,000',
         colors: colorsFor(settings.theme),
       ),
     );
-    if (newLimit != null) _applyNewLimit(newLimit, settings);
+    if (!context.mounted) return;
+    if (newLimit != null) _applyNewLimit(newLimit, settings, context);
     await _restoreEditorFocus();
   }
 
@@ -317,9 +308,9 @@ class _MainScreenState extends State<MainScreen> {
   /// text disappear, so asking permission to shorten it works against the point.
   /// _onTextChanged truncates when the text is over the limit and does nothing
   /// when it is not, so one call covers both cases.
-  void _applyNewLimit(int newLimit, AppSettings settings) {
+  void _applyNewLimit(int newLimit, AppSettings settings, BuildContext context) {
     settings.setMaxChars(newLimit);
-    widget.prefsService.saveMaxChars(newLimit);
+    _persist(() => widget.prefsService.saveMaxChars(newLimit), context);
     _onTextChanged(_controller.text, settings);
   }
 
@@ -374,8 +365,8 @@ class _MainScreenState extends State<MainScreen> {
                   trailing: settings.theme == theme ? const Icon(Icons.check) : null,
                   onTap: () {
                     settings.setTheme(theme);
-                    widget.prefsService.saveTheme(theme);
                     Navigator.pop(ctx);
+                    _persist(() => widget.prefsService.saveTheme(theme), context);
                   },
                 );
               }),
@@ -430,8 +421,8 @@ class _MainScreenState extends State<MainScreen> {
                   selectedFamily: settings.fontFamily,
                   onSelected: (family) {
                     settings.setFontFamily(family);
-                    widget.prefsService.saveFontFamily(family);
                     Navigator.pop(ctx);
+                    _persist(() => widget.prefsService.saveFontFamily(family), context);
                   },
                 ),
               ),
@@ -457,8 +448,9 @@ class _MainScreenState extends State<MainScreen> {
         colors: colorsFor(settings.theme),
       ),
     );
+    if (!context.mounted) return;
     if (applied != true) settings.setFontSize(originalSize);
-    widget.prefsService.saveFontSize(settings.fontSize);
+    _persist(() => widget.prefsService.saveFontSize(settings.fontSize), context);
     await _restoreEditorFocus();
   }
 
@@ -927,7 +919,7 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
   // typing a number one digit at a time.
   void _onFieldChanged(String text) {
     final value = int.tryParse(text);
-    if (value != null && value >= 6 && value <= 999) {
+    if (value != null && value >= minFontSize && value <= maxFontSize) {
       setState(() {
         _error = null;
         _size = value.toDouble();
@@ -943,7 +935,7 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
   void _apply() {
     if (_closing) return;
     final value = int.tryParse(_controller.text);
-    if (value == null || value < 6 || value > 999) {
+    if (value == null || value < minFontSize || value > maxFontSize) {
       setState(() => _error = 'Enter a size between 6 and 999 pt');
       _focusNode.requestFocus();
       _selectAll();

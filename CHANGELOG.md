@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Editor stopped accepting keystrokes after tapping empty space or leaving the window** - Tapping away from the editor or switching to another window and back left typing dead until the page was reloaded
+- **Corrupt or out-of-range saved settings could crash the app on launch** - Settings are now validated when they load, and anything invalid falls back to its default instead of throwing
+- **A setting that failed to save appeared to have been saved** - A failed write now warns that the change will not be remembered, rather than silently leaving the app and storage disagreeing
 
 ## [0.5.0] - 2026-07-30
 
