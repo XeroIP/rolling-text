@@ -24,6 +24,10 @@ extension AppThemeExtension on AppTheme {
 
 class AppColors {
   final Color background;
+
+  /// Surface for bottom sheets. Must differ from [background] so a sheet has a
+  /// visible edge against the editor behind it.
+  final Color sheetBackground;
   final Color text;
   final Color textSecondary;
   final Color buttonBackground;
@@ -31,6 +35,7 @@ class AppColors {
 
   const AppColors({
     required this.background,
+    required this.sheetBackground,
     required this.text,
     required this.textSecondary,
     required this.buttonBackground,
@@ -40,6 +45,7 @@ class AppColors {
 
 const lightColors = AppColors(
   background: Color(0xFFFFFFFF),
+  sheetBackground: Color(0xFFF4F0F7),
   text: Color(0xFF000000),
   textSecondary: Color(0xFF666666),
   buttonBackground: Color(0xFFE8DEF8),
@@ -48,6 +54,7 @@ const lightColors = AppColors(
 
 const darkColors = AppColors(
   background: Color(0xFF121212),
+  sheetBackground: Color(0xFF1E1E1E),
   text: Color(0xFFFFFFFF),
   textSecondary: Color(0xFFB0B0B0),
   buttonBackground: Color(0xFF2C2C2C),
@@ -56,6 +63,7 @@ const darkColors = AppColors(
 
 const sepiaColors = AppColors(
   background: Color(0xFFE8D5B8),
+  sheetBackground: Color(0xFFF2E4CE),
   text: Color(0xFF2C1810),
   textSecondary: Color(0xFF4E342E),
   buttonBackground: Color(0xFFC9AD88),
@@ -88,6 +96,9 @@ ThemeData themeDataFor(AppTheme theme) {
       surface: colors.background,
       onSurface: colors.text,
       onSurfaceVariant: colors.textSecondary,
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: colors.sheetBackground,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: colors.background,

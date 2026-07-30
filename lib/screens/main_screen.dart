@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -44,6 +45,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _editorFocusNode = FocusNode();
   final ValueNotifier<int> _charCount = ValueNotifier<int>(0);
   bool _isEnforcing = false;
   String _version = '';
@@ -58,9 +60,80 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    _editorFocusNode.dispose();
     _controller.dispose();
     _charCount.dispose();
     super.dispose();
+  }
+
+  /// Shows a bottom sheet and waits until it has fully gone away.
+  ///
+  /// showModalBottomSheet returns the route's `popped` future, which completes
+  /// while the sheet is still animating out and before the sheet disposes its
+  /// own focus nodes. Restoring editor focus at that point is silently undone
+  /// by the departing sheet -- observed in Chrome with the numeric sheets,
+  /// which own a text field. Awaiting TransitionRoute.completed instead means
+  /// the sheet is really gone before focus is restored.
+  Future<T?> _showSheet<T>({
+    required WidgetBuilder builder,
+    bool isScrollControlled = false,
+  }) async {
+    final navigator = Navigator.of(context);
+    final localizations = MaterialLocalizations.of(context);
+    final route = ModalBottomSheetRoute<T>(
+      builder: builder,
+      isScrollControlled: isScrollControlled,
+      capturedThemes: InheritedTheme.capture(
+        from: context,
+        to: navigator.context,
+      ),
+      barrierLabel: localizations.scrimLabel,
+      barrierOnTapHint: localizations.scrimOnTapHint(
+        localizations.bottomSheetLabel,
+      ),
+    );
+    final result = await navigator.push(route);
+    await route.completed;
+    return result;
+  }
+
+  /// Returns text input to the editor after a sheet closes. Web only.
+  ///
+  /// Flutter restores framework focus on its own when a route pops, and on
+  /// native platforms that is sufficient -- ModalRoute hands focus back to the
+  /// editor with a live input connection. On Web it is not enough: the editor's
+  /// FocusNode reports focus while the browser is left with no focused input
+  /// element, so the next keystroke goes nowhere. Verified in Chrome against
+  /// this build -- the hidden textarea Flutter uses for text input is focused
+  /// on load and unfocused after a sheet is dismissed, so a bare requestFocus()
+  /// would be a no-op. Cycling unfocus, then a frame, then refocus forces
+  /// EditableText to re-establish its input connection.
+  ///
+  /// The kIsWeb gate is load-bearing, not a micro-optimisation. Running this on
+  /// Android closes and reopens the software keyboard on every sheet dismissal,
+  /// a visible flicker confirmed on a Pixel 8 Pro release build. Do not remove
+  /// the gate to "simplify" the platform split.
+  ///
+  /// Equally, do not delete the body on the strength of a green test run:
+  /// widget tests run on the native platform, where this no-ops, and cannot
+  /// observe browser focus. Re-check in a real browser instead.
+  Future<void> _restoreEditorFocus() async {
+    if (!kIsWeb) return;
+    if (!mounted) return;
+    _editorFocusNode.unfocus();
+    // endOfFrame schedules a frame if none is pending; addPostFrameCallback
+    // does not, and would strand this when the app is idle.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _editorFocusNode.requestFocus();
+
+    // The draggable sheets (Font, About) tear down over one more frame than the
+    // plain ones, and that teardown drops the connection just restored above.
+    // Observed in Chrome: without this second pass, dismissing either of those
+    // two with Escape leaves the editor untypeable while the others are fine.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _editorFocusNode.requestFocus();
   }
 
   void _onTextChanged(String text, AppSettings settings) {
@@ -107,6 +180,7 @@ class _MainScreenState extends State<MainScreen> {
                         label: 'Start typing',
                         child: TextField(
                           controller: _controller,
+                          focusNode: _editorFocusNode,
                           onChanged: (text) => _onTextChanged(text, settings),
                           maxLines: null,
                           expands: true,
@@ -195,133 +269,43 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showLimitDialog(BuildContext context, AppSettings settings) {
-    final inputController =
-        TextEditingController(text: '${settings.maxChars}');
-
-    showModalBottomSheet(
-      context: context,
+  Future<void> _showLimitDialog(BuildContext context, AppSettings settings) async {
+    final newLimit = await _showSheet<int>(
       isScrollControlled: true,
-      builder: (ctx) {
-        final colors = colorsFor(settings.theme);
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            24, 16, 24,
-            MediaQuery.of(ctx).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Character Limit',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.text,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: inputController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                autofocus: true,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18),
-                decoration: InputDecoration(
-                  hintText: '1 \u2013 1,000,000',
-                  filled: true,
-                  fillColor: colors.buttonBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () {
-                      final value = int.tryParse(inputController.text);
-                      if (value == null || value < 1 || value > 1000000) {
-                        Navigator.pop(ctx);
-                        _showErrorDialog(context,
-                            'Please enter a number between 1 and 1,000,000');
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      _applyNewLimit(value, settings);
-                    },
-                    child: const Text('Apply'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (ctx) => _NumericSheet(
+        title: 'Character Limit',
+        hintText: '1 – 1,000,000',
+        initialValue: settings.maxChars,
+        minValue: 1,
+        maxValue: 1000000,
+        errorMessage: 'Please enter a number between 1 and 1,000,000',
+        colors: colorsFor(settings.theme),
+      ),
     );
+    if (newLimit != null) _applyNewLimit(newLimit, settings);
+    await _restoreEditorFocus();
   }
 
+  /// Applies a new limit, shortening the text if it no longer fits.
+  ///
+  /// A lower limit takes effect without confirmation: this editor exists to make
+  /// text disappear, so asking permission to shorten it works against the point.
+  /// _onTextChanged truncates when the text is over the limit and does nothing
+  /// when it is not, so one call covers both cases.
   void _applyNewLimit(int newLimit, AppSettings settings) {
-    final currentCount = _controller.text.runes.length;
-
-    if (newLimit < currentCount) {
-      final charsToRemove = currentCount - newLimit;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Warning'),
-          content: Text(
-            'This will remove $charsToRemove '
-            '${charsToRemove == 1 ? "character" : "characters"} '
-            'from the beginning of your text. Continue?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('No'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                settings.setMaxChars(newLimit);
-                widget.prefsService.saveMaxChars(newLimit);
-                _onTextChanged(_controller.text, settings);
-              },
-              child: const Text('Yes'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      settings.setMaxChars(newLimit);
-      widget.prefsService.saveMaxChars(newLimit);
-    }
+    settings.setMaxChars(newLimit);
+    widget.prefsService.saveMaxChars(newLimit);
+    _onTextChanged(_controller.text, settings);
   }
 
-  void _showThemeDialog(BuildContext context, AppSettings settings) {
-    showModalBottomSheet(
-      context: context,
+  Future<void> _showThemeDialog(BuildContext context, AppSettings settings) async {
+    await _showSheet<void>(
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
-        return Padding(
+        return Shortcuts(
+          shortcuts: _rowTraversalShortcuts,
+          child: _SheetInitialFocus(
+          builder: (rowFocusNode) => Padding(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -347,6 +331,11 @@ class _MainScreenState extends State<MainScreen> {
               ...AppTheme.values.map((theme) {
                 final themeColors = colorsFor(theme);
                 return ListTile(
+                  // Opening on the active row lets arrow keys navigate from
+                  // where the user already is. Traversal, the focus highlight
+                  // and Enter activation all come from the framework; only the
+                  // initial claim is ours -- see _SheetInitialFocus.
+                  focusNode: settings.theme == theme ? rowFocusNode : null,
                   leading: Container(
                     width: 32,
                     height: 32,
@@ -367,18 +356,22 @@ class _MainScreenState extends State<MainScreen> {
               }),
             ],
           ),
+          ),
+          ),
         );
       },
     );
+    await _restoreEditorFocus();
   }
 
-  void _showFontDialog(BuildContext context, AppSettings settings) {
-    showModalBottomSheet(
-      context: context,
+  Future<void> _showFontDialog(BuildContext context, AppSettings settings) async {
+    await _showSheet<void>(
       isScrollControlled: true,
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
-        return DraggableScrollableSheet(
+        return Shortcuts(
+          shortcuts: _rowTraversalShortcuts,
+          child: DraggableScrollableSheet(
           initialChildSize: 0.6,
           minChildSize: 0.3,
           maxChildSize: 0.9,
@@ -407,215 +400,75 @@ class _MainScreenState extends State<MainScreen> {
               ),
               const Divider(height: 1),
               Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  children: [
-                    _FontTile(
-                      label: 'Source Code Pro (Default)',
-                      style: GoogleFonts.getFont('Source Code Pro'),
-                      selected: settings.fontFamily == null,
-                      onTap: () {
-                        settings.setFontFamily(null);
-                        widget.prefsService.saveFontFamily(null);
-                        Navigator.pop(ctx);
-                      },
-                    ),
-                    ...availableFonts.map((family) {
-                      return _FontTile(
-                        label: family,
-                        style: GoogleFonts.getFont(family),
-                        selected: settings.fontFamily == family,
-                        onTap: () {
-                          settings.setFontFamily(family);
-                          widget.prefsService.saveFontFamily(family);
-                          Navigator.pop(ctx);
-                        },
-                      );
-                    }),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showFontSizeDialog(BuildContext context, AppSettings settings) {
-    double currentSize = settings.fontSize;
-
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        final colors = colorsFor(settings.theme);
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) => Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Font Size',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: colors.text,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '${currentSize.round()}pt',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: colors.text,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Slider(
-                  value: currentSize.clamp(6, 144),
-                  min: 6,
-                  max: 144,
-                  divisions: 138,
-                  label: '${currentSize.round()}pt',
-                  onChanged: (value) {
-                    setSheetState(() => currentSize = value.roundToDouble());
-                    settings.setFontSize(currentSize);
-                  },
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('6pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
-                    Text('144pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
+                child: _FontList(
+                  scrollController: scrollController,
+                  selectedFamily: settings.fontFamily,
+                  onSelected: (family) {
+                    settings.setFontFamily(family);
+                    widget.prefsService.saveFontFamily(family);
                     Navigator.pop(ctx);
-                    _showCustomFontSizeDialog(context, settings);
                   },
-                  child: const Text('Enter custom size\u2026'),
                 ),
-              ],
-            ),
-          ),
-        );
-      },
-    ).whenComplete(() {
-      widget.prefsService.saveFontSize(settings.fontSize);
-    });
-  }
-
-  void _showCustomFontSizeDialog(BuildContext context, AppSettings settings) {
-    final inputController =
-        TextEditingController(text: '${settings.fontSize.toInt()}');
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        final colors = colorsFor(settings.theme);
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            24, 16, 24,
-            MediaQuery.of(ctx).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Custom Font Size',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.text,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: inputController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                autofocus: true,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18),
-                decoration: InputDecoration(
-                  hintText: '6 \u2013 999',
-                  filled: true,
-                  fillColor: colors.buttonBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () {
-                      final value = int.tryParse(inputController.text);
-                      if (value == null || value < 6 || value > 999) {
-                        Navigator.pop(ctx);
-                        _showErrorDialog(
-                            context, 'Please enter a size between 6 and 999 pt');
-                        return;
-                      }
-                      settings.setFontSize(value.toDouble());
-                      widget.prefsService.saveFontSize(value.toDouble());
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('Apply'),
-                  ),
-                ],
               ),
             ],
+          ),
           ),
         );
       },
     );
+    await _restoreEditorFocus();
   }
 
-  void _showAboutSheet(BuildContext context, String version) {
+  Future<void> _showFontSizeDialog(
+    BuildContext context,
+    AppSettings settings,
+  ) async {
+    // The sheet previews sizes live, so a dismissal has to undo the preview.
+    // Only Apply (and the Enter that stands in for it) pops true.
+    final originalSize = settings.fontSize;
+    final applied = await _showSheet<bool>(
+      builder: (ctx) => _FontSizeSheet(
+        settings: settings,
+        colors: colorsFor(settings.theme),
+      ),
+    );
+    if (applied != true) settings.setFontSize(originalSize);
+    widget.prefsService.saveFontSize(settings.fontSize);
+    await _restoreEditorFocus();
+  }
+
+  Future<void> _showAboutSheet(BuildContext context, String version) async {
     final settings = context.read<AppSettings>();
     final colors = colorsFor(settings.theme);
 
-    showModalBottomSheet(
-      context: context,
+    await _showSheet<void>(
       isScrollControlled: true,
       builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.85,
         minChildSize: 0.4,
         maxChildSize: 0.95,
         expand: false,
-        builder: (_, scrollController) => Column(
+        builder: (_, scrollController) => CallbackShortcuts(
+          // Flutter's own ScrollAction resolves its target by walking UP from
+          // the focused node, so arrows only scroll while something inside the
+          // list holds focus. This list is lazy: an anchor placed in it is
+          // unmounted once scrolled past the cache extent, and the arrows then
+          // die partway down while the mouse wheel keeps working. Driving the
+          // controller costs a little arithmetic but never depends on where
+          // focus sits. The Focus below exists only so key events arrive.
+          bindings: <ShortcutActivator, VoidCallback>{
+            const SingleActivator(LogicalKeyboardKey.arrowDown):
+                () => _scrollAbout(scrollController, _aboutArrowStep),
+            const SingleActivator(LogicalKeyboardKey.arrowUp):
+                () => _scrollAbout(scrollController, -_aboutArrowStep),
+            const SingleActivator(LogicalKeyboardKey.pageDown):
+                () => _scrollAbout(scrollController, _aboutPageStep(scrollController)),
+            const SingleActivator(LogicalKeyboardKey.pageUp):
+                () => _scrollAbout(scrollController, -_aboutPageStep(scrollController)),
+          },
+          child: Focus(
+            autofocus: true,
+            child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
@@ -744,25 +597,524 @@ class _MainScreenState extends State<MainScreen> {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
+          ),
         ),
+      ),
+    );
+    await _restoreEditorFocus();
+  }
+
+  /// Makes bare arrow keys move focus between rows in a picker sheet.
+  ///
+  /// Required on Web and nowhere else. WidgetsApp.defaultShortcuts returns
+  /// _defaultWebShortcuts when kIsWeb, and that map binds bare arrows to
+  /// ScrollIntent -- only Tab and Shift+Tab traverse focus. The non-web maps bind
+  /// arrows to DirectionalFocusIntent, which is why every widget test passes
+  /// while the browser cannot select a theme or font at all: in the Theme sheet
+  /// the arrows hit a non-scrolling Column and do nothing, and in the Font sheet
+  /// they scroll the list without moving the selection.
+  ///
+  /// Verified in Chrome: an ArrowUp with the Theme sheet open arrived at
+  /// flutter-view with defaultPrevented still false, i.e. the framework declined
+  /// it, and the focus highlight never left the active row.
+  ///
+  /// DirectionalFocusAction is already in the default Actions map, so supplying
+  /// the intent is all this needs.
+  static const Map<ShortcutActivator, Intent> _rowTraversalShortcuts = {
+    SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(
+      TraversalDirection.down,
+    ),
+    SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(
+      TraversalDirection.up,
+    ),
+  };
+
+  /// One arrow press worth of About-sheet scrolling, in logical pixels.
+  static const double _aboutArrowStep = 80;
+
+  /// One page press worth, scaled to whatever the sheet is currently showing so
+  /// it always outruns an arrow press.
+  double _aboutPageStep(ScrollController controller) =>
+      controller.hasClients ? controller.position.viewportDimension * 0.8 : 0;
+
+  /// Scrolls the About sheet by [delta], clamped to the content.
+  void _scrollAbout(ScrollController controller, double delta) {
+    if (!controller.hasClients) return;
+    final position = controller.position;
+    controller.animateTo(
+      (position.pixels + delta).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+    );
+  }
+}
+
+/// Owns a [FocusNode] for the row a sheet should open on, and claims focus for
+/// it once the sheet has built.
+///
+/// ListTile.autofocus is not enough on Web. It registers the right node -- a
+/// single Tab lands on exactly the row autofocus named -- but it depends on the
+/// modal route's FocusScope taking focus when the route is pushed, and that does
+/// not happen in a browser. Verified in Chrome against this build: with the
+/// Theme sheet fully open, document.activeElement was still the *toolbar
+/// button* that opened it, outside the sheet's route. Arrows therefore traversed
+/// the toolbar behind the barrier and Enter re-fired a toolbar button, which
+/// reads to the user as the keyboard doing nothing at all. Requesting focus on a
+/// real node after the frame does not wait for the scope to claim anything.
+///
+/// Widget tests cannot catch this: the test binding pushes focus into the route
+/// scope, and the Theme sheet's test only ever runs with the default theme,
+/// whose row is first in the list either way.
+class _SheetInitialFocus extends StatefulWidget {
+  final Widget Function(FocusNode rowFocusNode) builder;
+
+  const _SheetInitialFocus({required this.builder});
+
+  @override
+  State<_SheetInitialFocus> createState() => _SheetInitialFocusState();
+}
+
+class _SheetInitialFocusState extends State<_SheetInitialFocus> {
+  final FocusNode _rowFocusNode = FocusNode(debugLabel: 'sheet initial row');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _rowFocusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _rowFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_rowFocusNode);
+}
+
+/// A bottom sheet that collects one whole number in a range.
+///
+/// Returns the accepted value via [Navigator.pop], so the caller decides what
+/// to persist and nothing is committed unless the user applies a valid entry.
+/// Stateful so the field's controller and focus node are disposed with the
+/// sheet rather than leaking on every open.
+class _NumericSheet extends StatefulWidget {
+  final String title;
+  final String hintText;
+  final int initialValue;
+  final int minValue;
+  final int maxValue;
+  final String errorMessage;
+  final AppColors colors;
+
+  const _NumericSheet({
+    required this.title,
+    required this.hintText,
+    required this.initialValue,
+    required this.minValue,
+    required this.maxValue,
+    required this.errorMessage,
+    required this.colors,
+  });
+
+  @override
+  State<_NumericSheet> createState() => _NumericSheetState();
+}
+
+class _NumericSheetState extends State<_NumericSheet> {
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.initialValue}');
+    _selectAll();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  /// Selects the whole value so the next keystroke replaces it rather than
+  /// appending to it.
+  void _selectAll() {
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
+  void _apply() {
+    final value = int.tryParse(_controller.text);
+    if (value == null || value < widget.minValue || value > widget.maxValue) {
+      // The sheet deliberately stays open: closing it would discard the value
+      // the user has just been asked to correct. The message is inline rather
+      // than a dialog so it matches the Font Size sheet and costs no keypress
+      // to dismiss.
+      setState(() => _error = widget.errorMessage);
+      _focusNode.requestFocus();
+      _selectAll();
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24, 16, 24,
+        MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(
+                widget.title,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colors.text,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: (_) => _apply(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 18),
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              errorText: _error,
+              filled: true,
+              fillColor: colors.buttonBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: _apply, child: const Text('Apply')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The Font Size sheet: a numeric field and a slider that both edit the same
+/// value live, kept in sync with each other.
+///
+/// The field is autofocused with its value preselected, so the sheet is
+/// typeable the instant it opens -- no button, no second sheet to reach a
+/// keyboard. Field precedes the slider in the widget tree, so a single Tab
+/// from the field reaches the slider.
+class _FontSizeSheet extends StatefulWidget {
+  final AppSettings settings;
+  final AppColors colors;
+
+  const _FontSizeSheet({required this.settings, required this.colors});
+
+  @override
+  State<_FontSizeSheet> createState() => _FontSizeSheetState();
+}
+
+class _FontSizeSheetState extends State<_FontSizeSheet> {
+  late double _size;
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+  String? _error;
+
+  /// One Enter can arrive twice -- once as a raw key event through the
+  /// sheet-level binding, once as a platform text input action through
+  /// onSubmitted. See framework_assumptions_test.dart. Without this the second
+  /// pop would dismiss whatever route is behind the sheet.
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _size = widget.settings.fontSize;
+    _controller = TextEditingController(text: '${_size.round()}');
+    _selectAll();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  /// Selects the whole value so the next keystroke replaces it rather than
+  /// appending to it.
+  void _selectAll() {
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
+  // Applies a valid value immediately, matching the slider. An invalid or
+  // incomplete value (e.g. "" while backspacing) is left un-applied and
+  // silent -- flashing an error on every keystroke would fight the user
+  // typing a number one digit at a time.
+  void _onFieldChanged(String text) {
+    final value = int.tryParse(text);
+    if (value != null && value >= 6 && value <= 999) {
+      setState(() {
+        _error = null;
+        _size = value.toDouble();
+      });
+      widget.settings.setFontSize(_size);
+    } else if (_error != null) {
+      setState(() => _error = null);
+    }
+  }
+
+  /// Commits the sheet. Reachable from Apply, from the field's own Enter, and
+  /// from the sheet-level Enter binding (which is how the slider commits).
+  void _apply() {
+    if (_closing) return;
+    final value = int.tryParse(_controller.text);
+    if (value == null || value < 6 || value > 999) {
+      setState(() => _error = 'Enter a size between 6 and 999 pt');
+      _focusNode.requestFocus();
+      _selectAll();
+      return;
+    }
+    // The value was already applied live by _onFieldChanged or _onSliderChanged.
+    _closing = true;
+    Navigator.pop(context, true);
+  }
+
+  void _onSliderChanged(double value) {
+    final rounded = value.roundToDouble();
+    setState(() {
+      _error = null;
+      _size = rounded;
+      _controller.text = '${rounded.round()}';
+      _selectAll();
+    });
+    widget.settings.setFontSize(rounded);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
+    return CallbackShortcuts(
+      // The slider owns focus after a drag and ignores Enter, so without a
+      // sheet-level binding there is no way to commit from the keyboard once
+      // you have touched it.
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.enter): _apply,
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): _apply,
+      },
+      child: Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Font Size',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colors.text,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onChanged: _onFieldChanged,
+            onSubmitted: (_) => _apply(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: colors.text,
+            ),
+            decoration: InputDecoration(
+              suffixText: 'pt',
+              errorText: _error,
+              filled: true,
+              fillColor: colors.buttonBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Slider(
+            value: _size.clamp(6, 144),
+            min: 6,
+            max: 144,
+            divisions: 138,
+            label: '${_size.round()}pt',
+            onChanged: _onSliderChanged,
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('6pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+              Text('144pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: _apply, child: const Text('Apply')),
+            ],
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+}
+
+/// The scrolling list of fonts.
+///
+/// Stateful so it can reveal the active font when the sheet opens. Rows past
+/// the viewport are built lazily, and a row that is never built can neither be
+/// seen nor take keyboard focus, so a font near the end of the list would
+/// otherwise be invisible and unreachable when its own picker opens.
+class _FontList extends StatefulWidget {
+  final ScrollController scrollController;
+  final String? selectedFamily;
+  final ValueChanged<String?> onSelected;
+
+  const _FontList({
+    required this.scrollController,
+    required this.selectedFamily,
+    required this.onSelected,
+  });
+
+  @override
+  State<_FontList> createState() => _FontListState();
+}
+
+class _FontListState extends State<_FontList> {
+  /// Enforced on the ListView below, so the offset arithmetic in
+  /// [_revealSelection] is exact by construction rather than an assumption
+  /// about how tall a ListTile happens to render.
+  static const double _tileExtent = 56;
+
+  static const List<String?> _options = [null, ...availableFonts];
+
+  final FocusNode _selectedNode = FocusNode(debugLabel: 'selected font');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _revealSelection();
+      // The jump above changes which rows exist, so the selected row is only
+      // built on the frame after it. Requesting focus any earlier targets a node
+      // with no context. See _SheetInitialFocus for why autofocus is not enough.
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) _selectedNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _selectedNode.dispose();
+    super.dispose();
+  }
+
+  void _revealSelection() {
+    final index = _options.indexOf(widget.selectedFamily);
+    if (!mounted || index <= 0) return;
+    final controller = widget.scrollController;
+    if (!controller.hasClients) return;
+    controller.jumpTo(
+      (index * _tileExtent).clamp(
+        controller.position.minScrollExtent,
+        controller.position.maxScrollExtent,
       ),
     );
   }
 
-  void _showErrorDialog(BuildContext context, String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Invalid Input'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      controller: widget.scrollController,
+      itemExtent: _tileExtent,
+      itemCount: _options.length,
+      itemBuilder: (context, index) {
+        final family = _options[index];
+        final selected = family == widget.selectedFamily;
+        return _FontTile(
+          label: family ?? 'Source Code Pro (Default)',
+          style: GoogleFonts.getFont(family ?? 'Source Code Pro'),
+          selected: selected,
+          focusNode: selected ? _selectedNode : null,
+          onTap: () => widget.onSelected(family),
+        );
+      },
     );
   }
 }
@@ -771,18 +1123,24 @@ class _FontTile extends StatelessWidget {
   final String label;
   final TextStyle style;
   final bool selected;
+  final FocusNode? focusNode;
   final VoidCallback onTap;
 
   const _FontTile({
     required this.label,
     required this.style,
     required this.selected,
+    required this.focusNode,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      // Opening on the active row lets arrow keys navigate from where the user
+      // already is. The initial focus claim is explicit rather than autofocus --
+      // see _SheetInitialFocus.
+      focusNode: focusNode,
       title: Text(label, style: style),
       trailing: selected ? const Icon(Icons.check) : null,
       selected: selected,

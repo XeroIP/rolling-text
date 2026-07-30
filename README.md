@@ -39,12 +39,15 @@ Type: "Hello Worl" -> 10 chars, at limit
 Type: "Hello World" -> "ello World" ('H' removed automatically)
 ```
 
+Lowering the limit below what you have already written removes the oldest characters immediately, without asking. Like everything else in Rolling Text, that text is gone rather than recoverable.
+
 ## Features
 
 - **Configurable character limit** - Set anywhere from 1 to 1,000,000 characters
 - **Themes** - Light, Dark, and Sepia
-- **Font picker** - Choose from 20 curated Google Fonts or System Default
-- **Adjustable font size** - 6pt to 144pt via slider, with custom sizes up to 999pt
+- **Font picker** - Choose from 20 curated Google Fonts, or Source Code Pro as the default. Uncached fonts require an internet connection on first use.
+- **Adjustable font size** - Type any size from 6pt to 999pt, or drag the slider for 6pt to 144pt
+- **Keyboard operation** - Every settings sheet works without a mouse: arrow keys move between themes and fonts, Enter applies, Escape closes, and arrow or page keys scroll the About text. Focus returns to the editor when a sheet closes.
 - **Settings persistence** - Character limit, theme, font, and font size are saved between sessions. Text is never saved.
 - **Unicode and emoji support** - Handles multi-byte characters correctly
 
