@@ -11,6 +11,7 @@
 // Flutter upgrade, the fix is to add the corresponding behaviour back to
 // main_screen.dart -- not to delete the test.
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,6 +114,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Character Limit'), findsNothing);
+  });
+
+  test('bare arrows traverse focus off-Web but scroll on Web', () {
+    // The single most important platform difference in this app's keyboard
+    // support. WidgetsApp.defaultShortcuts returns a *different map* when
+    // kIsWeb: bare arrows become ScrollIntent and only Tab traverses focus.
+    // Every arrow-traversal test in this suite runs off-Web and therefore
+    // passes while the browser cannot select a theme or font at all.
+    //
+    // This is why the Theme and Font sheets bind arrows to
+    // DirectionalFocusIntent themselves (_rowTraversalShortcuts). If a future
+    // SDK unifies the maps, this test fails and that binding becomes redundant
+    // -- but harmless, so prefer leaving it.
+    const down = SingleActivator(LogicalKeyboardKey.arrowDown);
+    final Intent? offWeb = WidgetsApp.defaultShortcuts[down];
+
+    expect(
+      offWeb,
+      isA<DirectionalFocusIntent>(),
+      reason: 'off-Web (this test platform) bare arrows traverse focus, which is '
+          'exactly why widget tests cannot catch the Web behaviour',
+    );
+    expect(
+      kIsWeb,
+      isFalse,
+      reason: 'if this ever runs on Web, the expectation above must flip to '
+          'ScrollIntent -- see WidgetsApp._defaultWebShortcuts',
+    );
   });
 
   testWidgets('arrow keys traverse ListTiles and Enter activates the focused row', (

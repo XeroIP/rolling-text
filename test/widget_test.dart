@@ -453,6 +453,54 @@ void main() {
     });
   });
 
+  group('picker sheets bind arrow traversal themselves', () {
+    // On Web, WidgetsApp.defaultShortcuts maps bare arrows to ScrollIntent, so
+    // arrow selection only works because these sheets ask for it. A test that
+    // just presses arrows passes on this platform either way and cannot detect
+    // the binding going missing -- so assert the binding itself.
+    void expectArrowTraversalBinding(WidgetTester tester) {
+      final shortcuts = tester
+          .widgetList<Shortcuts>(
+            find.descendant(
+              of: find.byType(BottomSheet),
+              matching: find.byType(Shortcuts),
+            ),
+          )
+          .expand((s) => s.shortcuts.entries)
+          .toList();
+
+      for (final key in [LogicalKeyboardKey.arrowDown, LogicalKeyboardKey.arrowUp]) {
+        expect(
+          shortcuts.any((e) {
+            final activator = e.key;
+            return activator is SingleActivator &&
+                activator.trigger == key &&
+                e.value is DirectionalFocusIntent;
+          }),
+          isTrue,
+          reason: '${key.keyLabel} must be bound to DirectionalFocusIntent, or '
+              'the sheet is unusable by keyboard on Web',
+        );
+      }
+    }
+
+    testWidgets('the theme sheet does', (tester) async {
+      await _pumpMainScreen(tester);
+      await tester.tap(find.byIcon(Icons.palette_outlined));
+      await tester.pumpAndSettle();
+
+      expectArrowTraversalBinding(tester);
+    });
+
+    testWidgets('the font sheet does', (tester) async {
+      await _pumpMainScreen(tester);
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      expectArrowTraversalBinding(tester);
+    });
+  });
+
   group('the editor is typeable again after every sheet closes', () {
     // These run on the native test platform, where _restoreEditorFocus no-ops
     // and ModalRoute restores focus by itself. They do not cover the Web fix --

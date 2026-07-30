@@ -327,7 +327,9 @@ class _MainScreenState extends State<MainScreen> {
     await _showSheet<void>(
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
-        return _SheetInitialFocus(
+        return Shortcuts(
+          shortcuts: _rowTraversalShortcuts,
+          child: _SheetInitialFocus(
           builder: (rowFocusNode) => Padding(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(
@@ -380,6 +382,7 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
           ),
+          ),
         );
       },
     );
@@ -391,7 +394,9 @@ class _MainScreenState extends State<MainScreen> {
       isScrollControlled: true,
       builder: (ctx) {
         final colors = colorsFor(settings.theme);
-        return DraggableScrollableSheet(
+        return Shortcuts(
+          shortcuts: _rowTraversalShortcuts,
+          child: DraggableScrollableSheet(
           initialChildSize: 0.6,
           minChildSize: 0.3,
           maxChildSize: 0.9,
@@ -431,6 +436,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
             ],
+          ),
           ),
         );
       },
@@ -624,6 +630,31 @@ class _MainScreenState extends State<MainScreen> {
     );
     await _restoreEditorFocus();
   }
+
+  /// Makes bare arrow keys move focus between rows in a picker sheet.
+  ///
+  /// Required on Web and nowhere else. WidgetsApp.defaultShortcuts returns
+  /// _defaultWebShortcuts when kIsWeb, and that map binds bare arrows to
+  /// ScrollIntent -- only Tab and Shift+Tab traverse focus. The non-web maps bind
+  /// arrows to DirectionalFocusIntent, which is why every widget test passes
+  /// while the browser cannot select a theme or font at all: in the Theme sheet
+  /// the arrows hit a non-scrolling Column and do nothing, and in the Font sheet
+  /// they scroll the list without moving the selection.
+  ///
+  /// Verified in Chrome: an ArrowUp with the Theme sheet open arrived at
+  /// flutter-view with defaultPrevented still false, i.e. the framework declined
+  /// it, and the focus highlight never left the active row.
+  ///
+  /// DirectionalFocusAction is already in the default Actions map, so supplying
+  /// the intent is all this needs.
+  static const Map<ShortcutActivator, Intent> _rowTraversalShortcuts = {
+    SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(
+      TraversalDirection.down,
+    ),
+    SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(
+      TraversalDirection.up,
+    ),
+  };
 
   /// One arrow press worth of About-sheet scrolling, in logical pixels.
   static const double _aboutArrowStep = 80;
