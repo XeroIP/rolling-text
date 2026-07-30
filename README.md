@@ -93,6 +93,25 @@ flutter build web                        # Web
 
 Download the latest APK from the [Releases](https://github.com/XeroIP/rolling-text/releases) page.
 
+## Releasing
+
+Releases are cut from tags. [`CHANGELOG.md`](CHANGELOG.md) is the single source of truth for what a release says.
+
+1. Add a `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`. Keep every bullet on one unbroken line — GitHub's release renderer turns mid-bullet newlines into visible line breaks instead of reflowing them.
+2. Set the matching version in `pubspec.yaml`, incrementing the build number after the `+` as well. Android refuses to install an APK whose build number is not higher than the installed one.
+3. Tag and push:
+
+    ```bash
+    git tag v0.5.0
+    git push origin v0.5.0
+    ```
+
+The `Build and release` workflow then runs the tests, builds signed release and debug APKs, and publishes a GitHub release whose notes are that CHANGELOG section followed by the auto-generated list of merged pull requests, with both APKs attached.
+
+It fails the release rather than publishing something wrong if the tag does not match `pubspec.yaml`, or if `CHANGELOG.md` has no section for that version.
+
+To build APKs without releasing, run the workflow manually from the Actions tab (`Actions > Build and release > Run workflow`); the APKs are uploaded as build artifacts instead.
+
 ## Technical Details
 
 - **Platforms**: Android, iOS, Web

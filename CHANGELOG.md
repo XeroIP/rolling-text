@@ -5,6 +5,50 @@ All notable changes to Rolling Text will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> Bullets in this file are single unbroken lines on purpose. GitHub's release renderer preserves mid-bullet newlines as visible line breaks instead of reflowing them, so a hard-wrapped bullet publishes as broken release notes.
+
+## [Unreleased]
+
+## [0.5.0] - 2026-07-30
+
+### Keyboard Accessibility Release
+
+Every settings sheet can now be driven without a mouse. Version 0.4.0 was only ever tagged as `v0.4.0-beta.1` and never released, so the changes staged for it are included here.
+
+### Added
+- **Keyboard operation of every settings sheet** - Arrow keys move between themes and fonts, Enter applies the focused choice, and Escape closes the sheet
+- **Focus opens on the active row** - The theme and font sheets focus the current selection when they open, so arrow keys navigate from where you already are rather than from the top of the list
+- **Off-screen selection is revealed** - The font sheet scrolls an active font that sits below the fold into view when it opens, since a row that is never built can neither be seen nor take keyboard focus
+- **Keyboard scrolling in About** - The About text scrolls with the arrow and page keys, all the way to the end of the content
+- **Immediately typeable font size** - The Font Size sheet opens with its numeric field focused and preselected, with the slider one Tab away
+- **Screen reader support for the character counter** - The counter is announced as "N of M characters used" instead of being hidden from assistive technology
+- **Release signing and CI builds** - Tagged releases produce signed release and debug APKs
+- **Unit tests for the rolling truncation logic** - Including Unicode and emoji boundary cases
+
+### Changed
+- **Reducing the character limit no longer asks for confirmation** - A lower limit applies immediately and the oldest characters are removed; that text is not recoverable
+- **Font size preview is a true preview** - The Font Size sheet previews live while open; Apply commits it, while Cancel, Escape, the close button and a barrier tap all revert to the size the sheet opened with
+- **Validation errors are inline** - Out-of-range values in the Character Limit and Font Size sheets are reported beneath the field and keep the sheet open, replacing the modal error dialogs. No dialogs remain anywhere in the app
+- **Font size is entered in the sheet itself** - A single field accepts any size from 6pt to 999pt, replacing the separate "Enter custom size" button and the second sheet it opened
+- **Bottom sheets have a visible edge** - Sheets are painted on a distinct surface so they separate from the editor in every theme
+- **Character count no longer rebuilds the whole screen** - Counting flows through a `ValueNotifier` rather than an empty `setState` on every keystroke
+
+### Fixed
+- **Android release builds could not download uncached Google Fonts** - A fresh install could not apply most fonts in the picker
+- **Editor stopped accepting keystrokes after closing a sheet on Web** - Dismissing any bottom sheet left the browser with no focused input element, and only a page reload recovered it
+- **Theme and font could not be selected with arrow keys on Web** - Flutter binds bare arrows to scrolling rather than focus traversal on Web, so the theme sheet ignored them entirely and the font sheet scrolled without moving the selection
+- **Picker sheets opened with focus outside the sheet on Web** - Focus stayed on the toolbar button behind the modal barrier instead of moving into the sheet
+- **About text could not be scrolled to its end with the keyboard** - The focus anchor it relied on was unmounted once it scrolled beyond the list's cache extent
+- **Out-of-range values could be committed** - The Character Limit and Font Size sheets now only accept values inside their valid range
+- **Font size wrote to disk on every drag tick** - The new size is saved once, when the sheet closes
+- **Duplicate hint text on focus** - The editor no longer showed a second hint in a different font
+
+### Known Issues
+- **iOS is untested on hardware** - It takes the same code path as Android, which was verified on a Pixel 8 Pro
+- **Editor can lose text input** - Tapping empty space or switching windows can leave the editor unable to accept typing until the page is reloaded ([#29](https://github.com/XeroIP/rolling-text/issues/29))
+
+---
+
 ## [0.3.0] - 2026-02-28
 
 ### Complete Rewrite in Flutter

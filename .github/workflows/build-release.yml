@@ -1,8 +1,13 @@
-name: Build APKs
+name: Build and release
 
+# Release creation and APK building must stay in ONE workflow. GitHub does not start a
+# new workflow run from an event raised by the default GITHUB_TOKEN, so splitting these
+# -- a tag-triggered job that creates the release, plus a separate `on: release` job that
+# attaches APKs -- would leave the second job unfired and publish releases with no APKs.
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 jobs:
@@ -20,6 +25,20 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Check the tag matches pubspec version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pubspec_version="$(sed -nE 's/^version: *([^+]+).*/\1/p' pubspec.yaml)"
+          if [ "$tag_version" != "$pubspec_version" ]; then
+            echo "Tag $GITHUB_REF_NAME implies $tag_version but pubspec.yaml declares $pubspec_version." >&2
+            echo "The APK filename and the version shown in the app would disagree." >&2
+            exit 1
+          fi
+
+      - name: Run tests
+        run: flutter test
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
@@ -40,22 +59,43 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
+      # Read the version from pubspec rather than the ref: on workflow_dispatch
+      # GITHUB_REF_NAME is a branch name, and a branch like build/foo would produce a
+      # path with a slash in it and fail the copy. The check above guarantees pubspec and
+      # the tag agree on tag builds.
       - name: Rename APKs
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="$(sed -nE 's/^version: *([^+]+).*/\1/p' pubspec.yaml)"
           cp build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/rolling-text-${VERSION}.apk"
           cp build/app/outputs/flutter-apk/app-debug.apk "build/app/outputs/flutter-apk/rolling-text-${VERSION}-debug.apk"
 
-      - name: Upload APKs to release
-        if: github.event_name == 'release'
+      - name: Extract this version's CHANGELOG section
+        if: startsWith(github.ref, 'refs/tags/')
+        id: changelog
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          gh release upload "$GITHUB_REF_NAME" \
-            "build/app/outputs/flutter-apk/rolling-text-${VERSION}.apk" \
-            "build/app/outputs/flutter-apk/rolling-text-${VERSION}-debug.apk" \
-            --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          version="${GITHUB_REF_NAME#v}"
+          # Take everything between this version's heading and the next one.
+          body=$(awk "/^## \[$version\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          # Trim leading and trailing blank lines, and the trailing --- separator.
+          body=$(printf '%s\n' "$body" | sed -e '/./,$!d' -e 's/^---$//' | sed -e :a -e '/^\n*$/{$d;N;ba}')
+          if [ -z "$(printf '%s' "$body" | tr -d '[:space:]')" ]; then
+            echo "CHANGELOG.md has no section for [$version]." >&2
+            echo "Refusing to publish a release with empty notes -- add the section and re-tag." >&2
+            exit 1
+          fi
+          printf 'body<<CHANGELOG_EOF\n%s\nCHANGELOG_EOF\n' "$body" >> "$GITHUB_OUTPUT"
+
+      # generate_release_notes appends GitHub's "What's Changed" PR list below `body`.
+      # Using `gh release create --notes` instead would replace the whole body and drop
+      # that list, which is how gencon-audiobook shipped two releases without it.
+      - name: Create the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
+        with:
+          body: ${{ steps.changelog.outputs.body }}
+          generate_release_notes: true
+          files: |
+            build/app/outputs/flutter-apk/rolling-text-*.apk
 
       - name: Upload APKs as artifacts
         if: github.event_name == 'workflow_dispatch'
