@@ -86734,7 +86734,7 @@ return s.tn(this.b,s.w)},
 $S:1}
 A.aNY.prototype={
 $1(a){var s=this.a
-return new A.qh("Character Limit","1 \u2013 1,000,000",s.a,1,25e3,"Please enter a number between 1 and 1,000,000",A.qx(s.b),null)},
+return new A.qh("Character Limit","1 \u2013 25000",s.a,1,25e3,"Please enter a number between 1 and 25000",A.qx(s.b),null)},
 $S:513}
 A.aNJ.prototype={
 $0(){return this.a.a.c.a.xB("Int","maxCharacters",this.b)},
