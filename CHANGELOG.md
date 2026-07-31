@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-07-31
+
+### Changed
+- **App icon and web favicon replaced** - New rolling-bars mark (six vertical bars fading from dark teal to white) replaces the placeholder icon across iOS, Android, and Web
+- **Character limit ceiling lowered from 1,000,000 to 25,000** - `EditableText` doesn't virtualize, so it lays out every glyph in the field on every keystroke; the old ceiling meant shaping up to a million glyphs per change, a structural cost no scan or allocation optimization could remove, so 25,000 stays well clear of it while leaving four orders of magnitude of headroom over the 128 default
+
+### Known Issues
+- **iOS is untested on hardware** - It takes the same code path as Android, which was verified on a Pixel 8 Pro
+
+---
+
 ## [0.5.4] - 2026-07-31
 
 ### Fixed
