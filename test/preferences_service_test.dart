@@ -96,6 +96,26 @@ void main() {
     expect(highSettings.maxChars, defaultMaxChars);
   });
 
+  test('a value above the lowered ceiling falls back to the default', () async {
+    // Pins the #18 ceiling reduction: this value was a valid maxCharacters
+    // under the old 1,000,000 limit and must now be rejected on load.
+    final service = await _serviceWith({'maxCharacters': 100000});
+    final settings = AppSettings();
+
+    service.loadInto(settings);
+
+    expect(settings.maxChars, defaultMaxChars);
+  });
+
+  test('a value at the lowered ceiling still loads unchanged', () async {
+    final service = await _serviceWith({'maxCharacters': maxMaxChars});
+    final settings = AppSettings();
+
+    service.loadInto(settings);
+
+    expect(settings.maxChars, maxMaxChars);
+  });
+
   test('an out-of-range fontSize falls back to the default', () async {
     final tooLow = await _serviceWith({'fontSize': 5.0});
     final tooHigh = await _serviceWith({'fontSize': 9999.0});

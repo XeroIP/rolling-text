@@ -7,7 +7,11 @@ const int defaultMaxChars = 128;
 // the ranges the settings sheets themselves enforce in main_screen.dart --
 // keep both in sync if either changes.
 const int minMaxChars = 1;
-const int maxMaxChars = 1000000;
+// EditableText doesn't virtualize -- it lays out every glyph in the field, so a
+// much higher ceiling would make every keystroke shape the whole buffer through
+// the font pipeline. 25,000 stays well clear of that without touching the hot
+// path itself.
+const int maxMaxChars = 25000;
 const double minFontSize = 6;
 const double maxFontSize = 999; // The numeric field's range, not the slider's
 // (6-144). Clamping to the slider's max would shrink a legitimately saved
