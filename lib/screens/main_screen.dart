@@ -321,58 +321,60 @@ class _MainScreenState extends State<MainScreen> {
         return Shortcuts(
           shortcuts: _rowTraversalShortcuts,
           child: _SheetInitialFocus(
-          builder: (rowFocusNode) => Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Select Theme',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.text,
+            builder: (rowFocusNode) => SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Select Theme',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: colors.text,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    ...AppTheme.values.map((theme) {
+                      final themeColors = colorsFor(theme);
+                      return ListTile(
+                        // Opening on the active row lets arrow keys navigate from
+                        // where the user already is. Traversal, the focus highlight
+                        // and Enter activation all come from the framework; only the
+                        // initial claim is ours -- see _SheetInitialFocus.
+                        focusNode: settings.theme == theme ? rowFocusNode : null,
+                        leading: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: themeColors.background,
+                            border: Border.all(color: themeColors.text.withValues(alpha: 0.3)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        title: Text(theme.label),
+                        trailing: settings.theme == theme ? const Icon(Icons.check) : null,
+                        onTap: () {
+                          settings.setTheme(theme);
+                          Navigator.pop(ctx);
+                          _persist(() => widget.prefsService.saveTheme(theme), context);
+                        },
+                      );
+                    }),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              ...AppTheme.values.map((theme) {
-                final themeColors = colorsFor(theme);
-                return ListTile(
-                  // Opening on the active row lets arrow keys navigate from
-                  // where the user already is. Traversal, the focus highlight
-                  // and Enter activation all come from the framework; only the
-                  // initial claim is ours -- see _SheetInitialFocus.
-                  focusNode: settings.theme == theme ? rowFocusNode : null,
-                  leading: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: themeColors.background,
-                      border: Border.all(color: themeColors.text.withValues(alpha: 0.3)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  title: Text(theme.label),
-                  trailing: settings.theme == theme ? const Icon(Icons.check) : null,
-                  onTap: () {
-                    settings.setTheme(theme);
-                    Navigator.pop(ctx);
-                    _persist(() => widget.prefsService.saveTheme(theme), context);
-                  },
-                );
-              }),
-            ],
-          ),
-          ),
+            ),
           ),
         );
       },

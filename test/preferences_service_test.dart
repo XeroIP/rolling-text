@@ -42,6 +42,20 @@ void main() {
     expect(settings.fontSize, 24.0);
   });
 
+  test('valid stored night and darkSepia themes load correctly', () async {
+    final nightService = await _serviceWith({'theme': 'night'});
+    final darkSepiaService = await _serviceWith({'theme': 'darkSepia'});
+
+    final nightSettings = AppSettings();
+    final darkSepiaSettings = AppSettings();
+
+    nightService.loadInto(nightSettings);
+    darkSepiaService.loadInto(darkSepiaSettings);
+
+    expect(nightSettings.theme, AppTheme.night);
+    expect(darkSepiaSettings.theme, AppTheme.darkSepia);
+  });
+
   test('a wrong-typed maxCharacters falls back to the default instead of throwing', () async {
     final service = await _serviceWith({'maxCharacters': 'not a number'});
     final settings = AppSettings();
