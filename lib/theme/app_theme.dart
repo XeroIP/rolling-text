@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 
-enum AppTheme { light, dark, sepia }
+enum AppTheme { light, dark, sepia, night, darkSepia }
 
 extension AppThemeExtension on AppTheme {
   String get label => switch (this) {
     AppTheme.light => 'Light',
     AppTheme.dark => 'Dark',
     AppTheme.sepia => 'Sepia',
+    AppTheme.night => 'Night',
+    AppTheme.darkSepia => 'Dark Sepia',
   };
 
   String get key => switch (this) {
     AppTheme.light => 'light',
     AppTheme.dark => 'dark',
     AppTheme.sepia => 'sepia',
+    AppTheme.night => 'night',
+    AppTheme.darkSepia => 'darkSepia',
   };
 
   static AppTheme fromKey(String key) => switch (key) {
     'dark' => AppTheme.dark,
     'sepia' => AppTheme.sepia,
+    'night' => AppTheme.night,
+    'darkSepia' => AppTheme.darkSepia,
     _ => AppTheme.light,
   };
 }
@@ -70,16 +76,38 @@ const sepiaColors = AppColors(
   buttonIcon: Color(0xFF2C1810),
 );
 
+const nightColors = AppColors(
+  background: Color(0xFF0D1017),
+  sheetBackground: Color(0xFF141821),
+  text: Color(0xFFBFBDB6),
+  textSecondary: Color(0xFF5A6378),
+  buttonBackground: Color(0xFF2E3440),
+  buttonIcon: Color(0xFFBFBDB6),
+);
+
+const darkSepiaColors = AppColors(
+  background: Color(0xFF120E0B),
+  sheetBackground: Color(0xFF1A1510),
+  text: Color(0xFF9C8C76),
+  textSecondary: Color(0xFF7A6C5A),
+  buttonBackground: Color(0xFF1E1811),
+  buttonIcon: Color(0xFF8F8069),
+);
+
 AppColors colorsFor(AppTheme theme) => switch (theme) {
   AppTheme.light => lightColors,
   AppTheme.dark => darkColors,
   AppTheme.sepia => sepiaColors,
+  AppTheme.night => nightColors,
+  AppTheme.darkSepia => darkSepiaColors,
 };
 
 ThemeData themeDataFor(AppTheme theme) {
   final colors = colorsFor(theme);
-  final brightness =
-      theme == AppTheme.dark ? Brightness.dark : Brightness.light;
+  final brightness = switch (theme) {
+    AppTheme.dark || AppTheme.night || AppTheme.darkSepia => Brightness.dark,
+    AppTheme.light || AppTheme.sepia => Brightness.light,
+  };
 
   return ThemeData(
     useMaterial3: true,
