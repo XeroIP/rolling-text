@@ -1,7 +1,7 @@
 # Rolling Text
 
 [![Android](https://img.shields.io/badge/Android-7.0%2B-green)](https://www.android.com)
-[![iOS](https://img.shields.io/badge/iOS-12.0%2B-blue)](https://www.apple.com/ios/)
+[![iOS](https://img.shields.io/badge/iOS-13.0%2B-blue)](https://www.apple.com/ios/)
 [![Web](https://img.shields.io/badge/Web-Chrome%2FSafari-orange)](https://github.com/XeroIP/rolling-text)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
