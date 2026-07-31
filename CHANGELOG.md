@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **The superseded native Android codebase** - `android-legacy/` held the pre-Flutter app, including setup and contributing docs that still told a reader to install Android Studio and JDK 8; the native code remains available at tag [`v2.1-2`](https://github.com/XeroIP/rolling-text/tree/v2.1-2)
+
 ## [0.6.0] - 2026-07-31
 
 ### Fixed
@@ -138,7 +141,7 @@ Every settings sheet can now be driven without a mouse. Version 0.4.0 was only e
 
 ### Complete Rewrite in Flutter
 
-The app has been rewritten from scratch in Flutter/Dart, replacing the native Android codebase. The original Android code is preserved in `android-legacy/`.
+The app has been rewritten from scratch in Flutter/Dart, replacing the native Android codebase. The original Android code remains available at tag [`v2.1-2`](https://github.com/XeroIP/rolling-text/tree/v2.1-2).
 
 ### Added
 - **iOS and Web support** - App now runs on Android, iOS, and Web from a single codebase
