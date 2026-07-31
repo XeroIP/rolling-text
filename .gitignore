@@ -74,5 +74,8 @@ android/key.properties
 # Claude-specific
 .claude/
 
+# Antigravity agent-specific
+.agents/
+
 # Temporary files
 commit-message.txt
