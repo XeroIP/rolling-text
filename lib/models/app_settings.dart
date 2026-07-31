@@ -14,8 +14,9 @@ const int minMaxChars = 1;
 const int maxMaxChars = 25000;
 const double minFontSize = 6;
 const double maxFontSize = 999; // The numeric field's range, not the slider's
-// (6-144). Clamping to the slider's max would shrink a legitimately saved
-// larger size on load.
+// (6-maxSliderFontSize). Clamping to the slider's max would shrink a
+// legitimately saved larger size on load.
+const double maxSliderFontSize = 144;
 
 /// Curated list of 20 Google Fonts, sorted alphabetically.
 const List<String> availableFonts = [

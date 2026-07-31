@@ -176,10 +176,10 @@ class _FontSizeSheetState extends State<FontSizeSheet> {
           ),
           const SizedBox(height: 8),
           Slider(
-            value: _size.clamp(6, 144),
-            min: 6,
-            max: 144,
-            divisions: 138,
+            value: _size.clamp(minFontSize, maxSliderFontSize),
+            min: minFontSize,
+            max: maxSliderFontSize,
+            divisions: (maxSliderFontSize - minFontSize).round(),
             label: '${_size.round()}pt',
             onChanged: _onSliderChanged,
           ),
@@ -191,7 +191,7 @@ class _FontSizeSheetState extends State<FontSizeSheet> {
               ),
               Flexible(
                 child: Text(
-                  '144pt',
+                  '${maxSliderFontSize.round()}pt',
                   style: TextStyle(color: colors.textSecondary, fontSize: 12),
                   textAlign: TextAlign.right,
                 ),
