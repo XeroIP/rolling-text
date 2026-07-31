@@ -29,6 +29,13 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    // A controller listener, not TextField.onChanged: EditableText only calls
+    // onChanged when the text itself changes, not when only the composing
+    // range does (see _formatAndSetValue in editable_text.dart). Deferring
+    // enforcement through onChanged would leave a since-composition-committed,
+    // still-over-limit buffer unenforced forever if the commit didn't also
+    // change the text.
+    _controller.addListener(_enforceCharacterLimit);
     PackageInfo.fromPlatform().then((info) {
       setState(() => _version = info.version);
     });
@@ -46,6 +53,7 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     _lifecycleListener.dispose();
     _editorFocusNode.dispose();
+    _controller.removeListener(_enforceCharacterLimit);
     _controller.dispose();
     _charCount.dispose();
     super.dispose();
@@ -121,15 +129,37 @@ class _MainScreenState extends State<MainScreen> {
     _editorFocusNode.requestFocus();
   }
 
-  void _onTextChanged(String text, AppSettings settings) {
+  void _enforceCharacterLimit() {
     if (_isEnforcing) return;
+
+    final settings = context.read<AppSettings>();
+    final value = _controller.value;
+    final text = value.text;
+
+    // Rewriting the value while an IME composition is in progress corrupts the
+    // composing range out from under the input method. Defer enforcement until
+    // the composition commits and this fires again with a collapsed range.
+    if (value.composing.isValid && !value.composing.isCollapsed) {
+      _charCount.value = text.characters.length;
+      return;
+    }
 
     if (text.characters.length > settings.maxChars) {
       _isEnforcing = true;
       final trimmed = truncateRollingText(text, settings.maxChars);
+      // truncateRollingText only ever drops a prefix, so trimmed is exactly a
+      // suffix of text; the UTF-16 units removed from the front is the same
+      // for every position, however many grapheme clusters that prefix spanned.
+      final removedUnits = text.length - trimmed.length;
+      int mapOffset(int offset) => (offset - removedUnits).clamp(0, trimmed.length);
       _controller.value = TextEditingValue(
         text: trimmed,
-        selection: TextSelection.collapsed(offset: trimmed.length),
+        selection: TextSelection(
+          baseOffset: mapOffset(value.selection.baseOffset),
+          extentOffset: mapOffset(value.selection.extentOffset),
+          affinity: value.selection.affinity,
+          isDirectional: value.selection.isDirectional,
+        ),
       );
       _isEnforcing = false;
     }
@@ -166,7 +196,9 @@ class _MainScreenState extends State<MainScreen> {
                         child: TextField(
                           controller: _controller,
                           focusNode: _editorFocusNode,
-                          onChanged: (text) => _onTextChanged(text, settings),
+                          // Enforcement lives on a controller listener (see
+                          // initState), not onChanged here -- onChanged only
+                          // fires when the text itself changes.
                           // The default TapRegion behaviour unfocuses the field
                           // on an outside tap. That is #29: nothing ever
                           // requests focus again afterward, so typing goes
@@ -306,12 +338,12 @@ class _MainScreenState extends State<MainScreen> {
   ///
   /// A lower limit takes effect without confirmation: this editor exists to make
   /// text disappear, so asking permission to shorten it works against the point.
-  /// _onTextChanged truncates when the text is over the limit and does nothing
-  /// when it is not, so one call covers both cases.
+  /// _enforceCharacterLimit truncates when the text is over the limit and does
+  /// nothing when it is not, so one call covers both cases.
   void _applyNewLimit(int newLimit, AppSettings settings, BuildContext context) {
     settings.setMaxChars(newLimit);
     _persist(() => widget.prefsService.saveMaxChars(newLimit), context);
-    _onTextChanged(_controller.text, settings);
+    _enforceCharacterLimit();
   }
 
   Future<void> _showThemeDialog(BuildContext context, AppSettings settings) async {
