@@ -29,7 +29,9 @@ Rolling Text isn't therapy, and it's not a replacement for professional support.
 
 ## How It Works
 
-The app maintains a rolling character limit. When you type past the limit, the oldest text is automatically removed from the beginning. Your cursor stays at the end so you can keep typing.
+The app maintains a rolling character limit. When you type past the limit, the oldest text is automatically removed from the beginning. Your cursor keeps its place in the text that survives, so you can keep typing.
+
+A character here means an extended grapheme cluster, which is what a reader thinks of as one character. A flag emoji or an accented letter counts once and is removed whole, rather than being cut apart into the code points it is built from.
 
 ```
 Limit: 10 characters
@@ -43,14 +45,14 @@ Lowering the limit below what you have already written removes the oldest charac
 
 ## Features
 
-- **Configurable character limit** - Set anywhere from 1 to 1,000,000 characters
-- **Themes** - Light, Dark, and Sepia
+- **Configurable character limit** - Set anywhere from 1 to 25,000 characters
+- **Themes** - Light, Dark, Sepia, Night, and Dark Sepia
 - **Font picker** - Choose from 20 curated Google Fonts, or Source Code Pro as the default. Uncached fonts require an internet connection on first use.
 - **Adjustable font size** - Type any size from 6pt to 999pt, or drag the slider for 6pt to 144pt
 - **Keyboard operation** - Every settings sheet works without a mouse: arrow keys move between themes and fonts, Enter applies, Escape closes, and arrow or page keys scroll the About text. Focus returns to the editor when a sheet closes, when you tap elsewhere in the app, or when you switch back to the app after leaving it.
 - **Settings persistence** - Character limit, theme, font, and font size are saved between sessions. Text is never saved. Saved values are validated on load and fall back to defaults if storage is corrupt or out of range. A setting that fails to save still applies for the session, with a warning that it won't be remembered.
 - **Private by default on Android** - The editor opts out of IME personalized learning, so what you type is not added to your keyboard's dictionary or typing history
-- **Unicode and emoji support** - Handles multi-byte characters correctly
+- **Unicode and emoji support** - Truncation removes whole extended grapheme clusters, so accented letters, flag emoji, skin-tone modifiers, and ZWJ sequences are never split in half at the boundary
 
 ## Installation
 
@@ -116,13 +118,27 @@ It fails the release rather than publishing something wrong if the tag does not 
 
 To build APKs without releasing, run the workflow manually from the Actions tab (`Actions > Build and release > Run workflow`); the APKs are uploaded as build artifacts instead.
 
+Tagging only publishes the APKs. The web app is published separately, as described below, so a release tag is not what updates the site.
+
+## Continuous integration
+
+Three workflows run in `.github/workflows/`, all pinned to Flutter 3.44.8:
+
+| Workflow | Trigger | What it does |
+| --- | --- | --- |
+| `build-release.yml` | Tag `v*.*.*`, or manual | Tests, builds signed APKs, publishes the GitHub release. See [Releasing](#releasing). |
+| `deploy-web.yml` | Every push to `main` | Builds `flutter build web --release --base-href /rolling-text/` and publishes it to GitHub Pages. |
+| `policy-pinned-actions.yml` | Push to `main`, and any PR touching `.github/workflows/**` | Fails if a third-party action is referenced by tag instead of a full 40-character commit SHA. |
+
+Because `deploy-web.yml` fires on every push to `main`, whatever is on `main` is what https://xeroip.github.io/rolling-text/ serves. There is no separate step to publish the web app.
+
 ## Technical Details
 
 - **Platforms**: Android, iOS, Web
 - **Language**: Dart
-- **Framework**: Flutter 3.x
+- **Framework**: Flutter 3.44.8 (pinned; see [Run from source](#run-from-source))
 - **Architecture**: Provider (ChangeNotifier)
-- **Dependencies**: `provider`, `shared_preferences`, `google_fonts`
+- **Dependencies**: `provider`, `shared_preferences`, `google_fonts`, `package_info_plus`, `characters`, `cupertino_icons`
 
 ## Roadmap
 
@@ -130,7 +146,7 @@ Have an idea for Rolling Text? Feature requests are welcome on the [GitHub Issue
 
 ## Contributing
 
-Contributions are welcome! Open an issue or submit a pull request on [GitHub](https://github.com/XeroIP/rolling-text).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, testing, and commit conventions, then open an issue or pull request on [GitHub](https://github.com/XeroIP/rolling-text).
 
 ## License
 
