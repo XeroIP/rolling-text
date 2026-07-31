@@ -443,6 +443,12 @@ class _MainScreenState extends State<MainScreen> {
     // Only Apply (and the Enter that stands in for it) pops true.
     final originalSize = settings.fontSize;
     final applied = await _showSheet<bool>(
+      // Required because this sheet owns a text field whose autofocus raises
+      // the keyboard immediately. Without it the sheet is capped at 9/16 of
+      // the screen and laid out against the unreduced bottom edge, which put
+      // it entirely underneath the keyboard -- see the viewInsets padding in
+      // _FontSizeSheet.build. Both halves are needed; neither works alone.
+      isScrollControlled: true,
       builder: (ctx) => _FontSizeSheet(
         settings: settings,
         colors: colorsFor(settings.theme),
@@ -968,8 +974,21 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
         const SingleActivator(LogicalKeyboardKey.enter): _apply,
         const SingleActivator(LogicalKeyboardKey.numpadEnter): _apply,
       },
+      // Scrollable because this sheet is the tallest of the five: with the
+      // keyboard up on a short screen, the field, slider, scale labels and
+      // buttons together can exceed what is left. Scrolling degrades better
+      // than clipping the Apply button off the bottom.
+      child: SingleChildScrollView(
       child: Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      // viewInsets.bottom lifts the sheet clear of the soft keyboard. The
+      // modal bottom sheet route does not do this for us -- it only clips to
+      // its layout box -- so a sheet with a focused field has to pad itself,
+      // exactly as _NumericSheet does. Pairs with isScrollControlled: true at
+      // the call site; without that this padding has no room to expand into.
+      padding: EdgeInsets.fromLTRB(
+        24, 16, 24,
+        MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1046,6 +1065,7 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
             ],
           ),
         ],
+      ),
       ),
       ),
     );

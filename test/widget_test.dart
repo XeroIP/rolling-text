@@ -752,6 +752,66 @@ void main() {
     });
   });
 
+  group('sheets with a text field stay above the soft keyboard', () {
+    // The bug these pin (#39) is invisible to every other test in this file:
+    // flutter_test has no soft keyboard and reports zero viewInsets, so a sheet
+    // laid out underneath the keyboard still satisfies findsOneWidget. Web and
+    // desktop have no soft keyboard either. Only a simulated inset plus a
+    // *geometric* assertion catches it, which is why these measure rendered
+    // bounds rather than checking the widget exists.
+    //
+    // tester.view.viewInsets is in physical pixels, hence the devicePixelRatio
+    // division to reason in the logical pixels getRect returns.
+    const double keyboardLogicalHeight = 300;
+
+    /// Raises a fake keyboard of [keyboardLogicalHeight] logical pixels and
+    /// returns the y coordinate of its top edge.
+    double simulateKeyboard(WidgetTester tester) {
+      final double dpr = tester.view.devicePixelRatio;
+      tester.view.viewInsets = FakeViewPadding(
+        bottom: keyboardLogicalHeight * dpr,
+      );
+      addTearDown(tester.view.resetViewInsets);
+      return tester.view.physicalSize.height / dpr - keyboardLogicalHeight;
+    }
+
+    testWidgets('the Font Size sheet does', (tester) async {
+      await _pumpMainScreen(tester);
+      final double keyboardTop = simulateKeyboard(tester);
+
+      await _openFontSize(tester);
+
+      // Apply is the bottom-most control in the sheet, so if it clears the
+      // keyboard the whole sheet does.
+      final applyBottom = tester.getRect(
+        find.widgetWithText(FilledButton, 'Apply'),
+      ).bottom;
+      expect(
+        applyBottom,
+        lessThanOrEqualTo(keyboardTop),
+        reason: 'the Font Size sheet must not be laid out under the keyboard',
+      );
+    });
+
+    testWidgets('the Character Limit sheet does', (tester) async {
+      await _pumpMainScreen(tester);
+      final double keyboardTop = simulateKeyboard(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+
+      final applyBottom = tester.getRect(
+        find.widgetWithText(FilledButton, 'Apply'),
+      ).bottom;
+      expect(
+        applyBottom,
+        lessThanOrEqualTo(keyboardTop),
+        reason: 'this sheet already handled the keyboard correctly -- pin it '
+            'so it cannot regress the way the Font Size sheet did',
+      );
+    });
+  });
+
   group('preference writes are surfaced and reconciled', () {
     testWidgets('a failed save keeps the change applied and warns it will not be remembered', (
       tester,
