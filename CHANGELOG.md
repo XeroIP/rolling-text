@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-30
+
+### Fixed
+- **Font Size sheet was hidden behind the keyboard on Android** - Opening it raised the numpad over the sheet, leaving the slider, the current size and the Cancel button unreachable; the sheet now stays above the keyboard and scrolls if a short screen cannot fit it
+
+### Known Issues
+- **iOS is untested on hardware** - It takes the same code path as Android, which was verified on a Pixel 8 Pro
+
+---
+
 ## [0.5.1] - 2026-07-30
 
 ### Changed
