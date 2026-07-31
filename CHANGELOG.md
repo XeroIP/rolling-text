@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-31
+
+### Fixed
+- **Rolling truncation could split a grapheme cluster in half** - Accented letters, flags, and emoji built from multiple code points (ZWJ sequences, skin-tone modifiers, regional indicators) could be corrupted at the truncation boundary; truncation now operates on extended grapheme clusters instead of code points
+- **Truncation always collapsed the cursor to the end and could corrupt an in-progress IME composition** - Enforcement now preserves the user's selection (or cursor position) relative to the surviving text, and defers entirely while an IME composition is active rather than rewriting text out from under it
+- **Bottom-sheet headers overflowed at large accessibility text scales** - The Theme, Font, About, Character Limit, and Font Size sheets could overflow behind the close button, or vertically past the sheet's own height, on a narrow screen at 200-300% text scale; headers now wrap, action-button rows use OverflowBar, and the Character Limit sheet scrolls like the Font Size sheet already did
+
+### Changed
+- **Sheet widgets extracted from main_screen.dart** - Six private widget classes (the Character Limit and Font Size sheets, the font picker, the toolbar button, and the About sheet's text widgets) moved to lib/widgets/, shrinking main_screen.dart from 1357 to 730 lines with no behavior change
+
+### Known Issues
+- **iOS is untested on hardware** - It takes the same code path as Android, which was verified on a Pixel 8 Pro
+
+---
+
 ## [0.5.6] - 2026-07-31
 
 ### Fixed
