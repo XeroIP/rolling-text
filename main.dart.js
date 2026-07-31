@@ -86734,7 +86734,7 @@ return s.tn(this.b,s.w)},
 $S:1}
 A.aNY.prototype={
 $1(a){var s=this.a
-return new A.qh("Character Limit","1 \u2013 1,000,000",s.a,1,1e6,"Please enter a number between 1 and 1,000,000",A.qx(s.b),null)},
+return new A.qh("Character Limit","1 \u2013 1,000,000",s.a,1,25e3,"Please enter a number between 1 and 1,000,000",A.qx(s.b),null)},
 $S:513}
 A.aNJ.prototype={
 $0(){return this.a.a.c.a.xB("Int","maxCharacters",this.b)},
@@ -87050,7 +87050,7 @@ A.pX.prototype={
 K(a){var s=this,r=null,q=s.f,p=q.c
 return A.lj(A.f([A.cR(s.c,r,r,r,A.cr(r,r,p,r,r,r,r,r,r,r,r,16,r,r,B.b5,r,1.4,!0,r,r,r,r,r,r,r,r),r,r),B.im,A.cR(s.d,r,r,r,A.cr(r,r,p,r,r,r,r,r,r,r,r,16,r,r,r,r,1.4,!0,r,r,r,r,r,r,r,r),r,r),B.NK,A.cR(s.e,r,r,r,A.cr(r,r,q.d,r,r,r,r,r,r,r,r,13,B.bv,r,r,r,r,!0,r,r,r,r,r,r,r,r),r,r),B.z2],t.E),B.c3,B.dD)}}
 A.adR.prototype={
-ahq(a){if(!A.qt(a)||a<1||a>1e6)return 128
+ahq(a){if(!A.qt(a)||a<1||a>25e3)return 128
 return a},
 ahp(a){if(typeof a!="number"||a<6||a>999)return 16
 return a},
