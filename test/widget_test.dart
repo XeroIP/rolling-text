@@ -680,6 +680,200 @@ void main() {
     });
   });
 
+  group('rolling truncation preserves selection and composing', () {
+    Future<void> setMaxChars(WidgetTester tester, int value) async {
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '$value');
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+    }
+
+    TextEditingController editorController(WidgetTester tester) =>
+        tester.widget<TextField>(find.byType(TextField).first).controller!;
+
+    testWidgets('cursor position is preserved for a mid-text insert at the limit', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await setMaxChars(tester, 5);
+      await tester.enterText(find.byType(TextField).first, 'abcde');
+      await tester.pump();
+
+      // Simulate the IME inserting 'X' after the 'b', as a real mid-text edit
+      // would arrive from the platform: full new value, cursor right after
+      // the inserted character.
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'abXcde',
+          selection: TextSelection.collapsed(offset: 3),
+        ),
+      );
+      await tester.pump();
+
+      expect(editorController(tester).text, 'bXcde');
+      expect(
+        editorController(tester).selection,
+        const TextSelection.collapsed(offset: 2),
+        reason:
+            "the cursor sat right after 'X' before truncation and should "
+            "still sit right after it, not jump to the end",
+      );
+    });
+
+    testWidgets('a selection range survives truncation, not just a cursor', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await setMaxChars(tester, 5);
+
+      // 'abXYZcde' (8 chars) with "XYZ" selected, dropping over the limit.
+      // Truncating to the last 5 keeps "YZcde", so only "YZ" of the original
+      // selection survives -- it should remain selected, not collapse.
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'abXYZcde',
+          selection: TextSelection(baseOffset: 2, extentOffset: 5),
+        ),
+      );
+      await tester.pump();
+
+      expect(editorController(tester).text, 'YZcde');
+      expect(
+        editorController(tester).selection,
+        const TextSelection(baseOffset: 0, extentOffset: 2),
+      );
+    });
+
+    testWidgets('an active composing range is not truncated mid-composition', (
+      tester,
+    ) async {
+      await _pumpMainScreen(tester);
+      await setMaxChars(tester, 5);
+      await tester.enterText(find.byType(TextField).first, 'abcde');
+      await tester.pump();
+
+      // An IME candidate ("fgh") composed after 'abcde', not yet committed:
+      // this pushes the buffer to 8 characters, over the 5-character limit.
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'abcdefgh',
+          selection: TextSelection.collapsed(offset: 8),
+          composing: TextRange(start: 5, end: 8),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        editorController(tester).text,
+        'abcdefgh',
+        reason: 'truncating mid-composition would corrupt the composing range',
+      );
+
+      // The IME commits the composition: composing collapses, same text.
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: 'abcdefgh',
+          selection: TextSelection.collapsed(offset: 8),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        editorController(tester).text,
+        'defgh',
+        reason: 'enforcement applies once the composition commits',
+      );
+    });
+  });
+
+  group('sheet headers remain usable at large text scale', () {
+    /// Narrow phone width plus a 300% accessibility text scale -- the
+    /// combination #22 was filed against, where a fixed title-and-close-button
+    /// row can overflow instead of the title wrapping.
+    Future<void> pumpNarrowAndScaled(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      tester.platformDispatcher.textScaleFactorTestValue = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await _pumpMainScreen(tester);
+    }
+
+    void expectCloseButtonUsable(WidgetTester tester) {
+      expect(tester.takeException(), isNull, reason: 'no overflow at this scale');
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      final closeButtonSize = tester.getSize(find.byIcon(Icons.close));
+      expect(
+        closeButtonSize.width,
+        greaterThan(0),
+        reason: 'the close icon has nonzero layout size, not clipped to nothing',
+      );
+    }
+
+    testWidgets('the theme sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.palette_outlined));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Select Theme'), findsNothing);
+    });
+
+    testWidgets('the font sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Select Font'), findsNothing);
+    });
+
+    testWidgets('the about sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('About Rolling Text'), findsNothing);
+    });
+
+    testWidgets('the character limit sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Character Limit'), findsNothing);
+    });
+
+    testWidgets('the font size sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.format_size));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Font Size'), findsNothing);
+    });
+  });
+
   group('about sheet is readable from the keyboard', () {
     Future<ScrollableState> openAbout(WidgetTester tester) async {
       await tester.tap(find.byIcon(Icons.info_outline));

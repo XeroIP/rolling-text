@@ -8,6 +8,12 @@ import '../models/app_settings.dart';
 import '../services/preferences_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/text_truncation.dart';
+import '../widgets/about_text.dart';
+import '../widgets/font_list.dart';
+import '../widgets/font_size_sheet.dart';
+import '../widgets/numeric_sheet.dart';
+import '../widgets/sheet_initial_focus.dart';
+import '../widgets/toolbar_button.dart';
 
 class MainScreen extends StatefulWidget {
   final PreferencesService prefsService;
@@ -29,6 +35,13 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    // A controller listener, not TextField.onChanged: EditableText only calls
+    // onChanged when the text itself changes, not when only the composing
+    // range does (see _formatAndSetValue in editable_text.dart). Deferring
+    // enforcement through onChanged would leave a since-composition-committed,
+    // still-over-limit buffer unenforced forever if the commit didn't also
+    // change the text.
+    _controller.addListener(_enforceCharacterLimit);
     PackageInfo.fromPlatform().then((info) {
       setState(() => _version = info.version);
     });
@@ -46,6 +59,7 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     _lifecycleListener.dispose();
     _editorFocusNode.dispose();
+    _controller.removeListener(_enforceCharacterLimit);
     _controller.dispose();
     _charCount.dispose();
     super.dispose();
@@ -121,19 +135,41 @@ class _MainScreenState extends State<MainScreen> {
     _editorFocusNode.requestFocus();
   }
 
-  void _onTextChanged(String text, AppSettings settings) {
+  void _enforceCharacterLimit() {
     if (_isEnforcing) return;
 
-    if (text.runes.length > settings.maxChars) {
+    final settings = context.read<AppSettings>();
+    final value = _controller.value;
+    final text = value.text;
+
+    // Rewriting the value while an IME composition is in progress corrupts the
+    // composing range out from under the input method. Defer enforcement until
+    // the composition commits and this fires again with a collapsed range.
+    if (value.composing.isValid && !value.composing.isCollapsed) {
+      _charCount.value = text.characters.length;
+      return;
+    }
+
+    if (text.characters.length > settings.maxChars) {
       _isEnforcing = true;
       final trimmed = truncateRollingText(text, settings.maxChars);
+      // truncateRollingText only ever drops a prefix, so trimmed is exactly a
+      // suffix of text; the UTF-16 units removed from the front is the same
+      // for every position, however many grapheme clusters that prefix spanned.
+      final removedUnits = text.length - trimmed.length;
+      int mapOffset(int offset) => (offset - removedUnits).clamp(0, trimmed.length);
       _controller.value = TextEditingValue(
         text: trimmed,
-        selection: TextSelection.collapsed(offset: trimmed.length),
+        selection: TextSelection(
+          baseOffset: mapOffset(value.selection.baseOffset),
+          extentOffset: mapOffset(value.selection.extentOffset),
+          affinity: value.selection.affinity,
+          isDirectional: value.selection.isDirectional,
+        ),
       );
       _isEnforcing = false;
     }
-    _charCount.value = _controller.text.runes.length;
+    _charCount.value = _controller.text.characters.length;
   }
 
   TextStyle _textStyle(AppSettings settings) {
@@ -166,7 +202,9 @@ class _MainScreenState extends State<MainScreen> {
                         child: TextField(
                           controller: _controller,
                           focusNode: _editorFocusNode,
-                          onChanged: (text) => _onTextChanged(text, settings),
+                          // Enforcement lives on a controller listener (see
+                          // initState), not onChanged here -- onChanged only
+                          // fires when the text itself changes.
                           // The default TapRegion behaviour unfocuses the field
                           // on an outside tap. That is #29: nothing ever
                           // requests focus again afterward, so typing goes
@@ -225,14 +263,14 @@ class _MainScreenState extends State<MainScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _ToolbarButton(
+                  ToolbarButton(
                     icon: Icons.tune,
                     tooltip: 'Change character limit',
                     colors: colors,
                     onPressed: () => _showLimitDialog(context, settings),
                   ),
                   const SizedBox(width: 12),
-                  _ToolbarButton(
+                  ToolbarButton(
                     icon: Icons.palette_outlined,
                     tooltip:
                         'Change theme. Current theme is ${settings.theme.label} mode',
@@ -240,21 +278,21 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: () => _showThemeDialog(context, settings),
                   ),
                   const SizedBox(width: 12),
-                  _ToolbarButton(
+                  ToolbarButton(
                     icon: Icons.text_format,
                     tooltip: 'Choose font',
                     colors: colors,
                     onPressed: () => _showFontDialog(context, settings),
                   ),
                   const SizedBox(width: 12),
-                  _ToolbarButton(
+                  ToolbarButton(
                     icon: Icons.format_size,
                     tooltip: 'Change font size',
                     colors: colors,
                     onPressed: () => _showFontSizeDialog(context, settings),
                   ),
                   const SizedBox(width: 12),
-                  _ToolbarButton(
+                  ToolbarButton(
                     icon: Icons.info_outline,
                     tooltip: 'About Rolling Text',
                     colors: colors,
@@ -287,7 +325,7 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _showLimitDialog(BuildContext context, AppSettings settings) async {
     final newLimit = await _showSheet<int>(
       isScrollControlled: true,
-      builder: (ctx) => _NumericSheet(
+      builder: (ctx) => NumericSheet(
         title: 'Character Limit',
         hintText: '$minMaxChars – $maxMaxChars',
         initialValue: settings.maxChars,
@@ -306,12 +344,12 @@ class _MainScreenState extends State<MainScreen> {
   ///
   /// A lower limit takes effect without confirmation: this editor exists to make
   /// text disappear, so asking permission to shorten it works against the point.
-  /// _onTextChanged truncates when the text is over the limit and does nothing
-  /// when it is not, so one call covers both cases.
+  /// _enforceCharacterLimit truncates when the text is over the limit and does
+  /// nothing when it is not, so one call covers both cases.
   void _applyNewLimit(int newLimit, AppSettings settings, BuildContext context) {
     settings.setMaxChars(newLimit);
     _persist(() => widget.prefsService.saveMaxChars(newLimit), context);
-    _onTextChanged(_controller.text, settings);
+    _enforceCharacterLimit();
   }
 
   Future<void> _showThemeDialog(BuildContext context, AppSettings settings) async {
@@ -320,7 +358,7 @@ class _MainScreenState extends State<MainScreen> {
         final colors = colorsFor(settings.theme);
         return Shortcuts(
           shortcuts: _rowTraversalShortcuts,
-          child: _SheetInitialFocus(
+          child: SheetInitialFocus(
             builder: (rowFocusNode) => SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
@@ -329,15 +367,16 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'Select Theme',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: colors.text,
+                        Expanded(
+                          child: Text(
+                            'Select Theme',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: colors.text,
+                            ),
                           ),
                         ),
-                        const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.pop(ctx),
@@ -400,15 +439,16 @@ class _MainScreenState extends State<MainScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
                 child: Row(
                   children: [
-                    Text(
-                      'Select Font',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: colors.text,
+                    Expanded(
+                      child: Text(
+                        'Select Font',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: colors.text,
+                        ),
                       ),
                     ),
-                    const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(ctx),
@@ -418,7 +458,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
               const Divider(height: 1),
               Expanded(
-                child: _FontList(
+                child: FontList(
                   scrollController: scrollController,
                   selectedFamily: settings.fontFamily,
                   onSelected: (family) {
@@ -451,7 +491,7 @@ class _MainScreenState extends State<MainScreen> {
       // it entirely underneath the keyboard -- see the viewInsets padding in
       // _FontSizeSheet.build. Both halves are needed; neither works alone.
       isScrollControlled: true,
-      builder: (ctx) => _FontSizeSheet(
+      builder: (ctx) => FontSizeSheet(
         settings: settings,
         colors: colorsFor(settings.theme),
       ),
@@ -499,15 +539,25 @@ class _MainScreenState extends State<MainScreen> {
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
               child: Row(
                 children: [
-                  Text(
-                    'About Rolling Text',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.text,
+                  Expanded(
+                    // The body below scrolls in its own ListView, but this
+                    // header sits outside it, so an unbounded title could grow
+                    // tall enough at a large text scale to overflow the sheet's
+                    // fixed height on its own. Capped so the header's height
+                    // stays predictable regardless of scale; a screen reader
+                    // still announces the full string via this Text's own
+                    // semantics node even when visually truncated.
+                    child: Text(
+                      'About Rolling Text',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: colors.text,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.pop(ctx),
@@ -521,7 +571,7 @@ class _MainScreenState extends State<MainScreen> {
                 controller: scrollController,
                 padding: const EdgeInsets.all(24),
                 children: [
-                  _AboutBodyText(
+                  AboutBodyText(
                     'We all carry thoughts we wish we didn\'t. The worries that '
                     'keep us up at night. The harsh things we say to ourselves. '
                     'The moments we replay over and over even though we can\'t '
@@ -530,7 +580,7 @@ class _MainScreenState extends State<MainScreen> {
                     colors: colors,
                   ),
                   const SizedBox(height: 16),
-                  _AboutBodyText(
+                  AboutBodyText(
                     'Rolling Text is a simple place to set those thoughts down. '
                     'As you type, your words quietly disappear. Nothing is saved. '
                     'Nothing is stored. You don\'t have to organize your feelings '
@@ -538,7 +588,7 @@ class _MainScreenState extends State<MainScreen> {
                     colors: colors,
                   ),
                   const SizedBox(height: 16),
-                  _AboutBodyText(
+                  AboutBodyText(
                     'There\'s something powerful about putting a difficult thought '
                     'into words and then watching it leave. You\'re not ignoring '
                     'what you feel. You\'re giving yourself permission to feel it, '
@@ -556,7 +606,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _AboutStudy(
+                  AboutStudy(
                     title: 'Writing down your thoughts and letting them go actually works.',
                     body: 'Researchers found that when people wrote down negative '
                         'thoughts and then discarded them, even digitally by dragging '
@@ -567,7 +617,7 @@ class _MainScreenState extends State<MainScreen> {
                     citation: 'Bri\u00f1ol, Petty, Gasc\u00f3 & Horcajo, 2012, Psychological Science',
                     colors: colors,
                   ),
-                  _AboutStudy(
+                  AboutStudy(
                     title: 'Putting your feelings into words is a form of healing.',
                     body: 'Over four decades of research on expressive writing, '
                         'pioneered by psychologist James Pennebaker, has shown that '
@@ -578,7 +628,7 @@ class _MainScreenState extends State<MainScreen> {
                     citation: 'Pennebaker, 2018, Perspectives on Psychological Science',
                     colors: colors,
                   ),
-                  _AboutStudy(
+                  AboutStudy(
                     title: 'You are not your thoughts.',
                     body: 'In Acceptance and Commitment Therapy (ACT), a practice '
                         'called cognitive defusion helps people step back and see '
@@ -590,7 +640,7 @@ class _MainScreenState extends State<MainScreen> {
                     citation: 'Masuda et al., 2004, Behavior Therapy; Larsson et al., 2016, Behavior Modification',
                     colors: colors,
                   ),
-                  _AboutStudy(
+                  AboutStudy(
                     title: 'Letting go isn\'t weakness. It\'s a skill.',
                     body: 'A 2023 study from the University of Cambridge found that '
                         'people who practiced actively releasing unwanted thoughts '
@@ -601,7 +651,7 @@ class _MainScreenState extends State<MainScreen> {
                     citation: 'Mamat et al., 2023, Science Advances',
                     colors: colors,
                   ),
-                  _AboutBodyText(
+                  AboutBodyText(
                     'Rolling Text isn\'t therapy, and it\'s not a replacement for '
                     'professional support. If you\'re struggling, please reach out '
                     'to someone who can help. But for the everyday weight of being '
@@ -675,618 +725,6 @@ class _MainScreenState extends State<MainScreen> {
       ),
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOut,
-    );
-  }
-}
-
-/// Owns a [FocusNode] for the row a sheet should open on, and claims focus for
-/// it once the sheet has built.
-///
-/// ListTile.autofocus is not enough on Web. It registers the right node -- a
-/// single Tab lands on exactly the row autofocus named -- but it depends on the
-/// modal route's FocusScope taking focus when the route is pushed, and that does
-/// not happen in a browser. Verified in Chrome against this build: with the
-/// Theme sheet fully open, document.activeElement was still the *toolbar
-/// button* that opened it, outside the sheet's route. Arrows therefore traversed
-/// the toolbar behind the barrier and Enter re-fired a toolbar button, which
-/// reads to the user as the keyboard doing nothing at all. Requesting focus on a
-/// real node after the frame does not wait for the scope to claim anything.
-///
-/// Widget tests cannot catch this: the test binding pushes focus into the route
-/// scope, and the Theme sheet's test only ever runs with the default theme,
-/// whose row is first in the list either way.
-class _SheetInitialFocus extends StatefulWidget {
-  final Widget Function(FocusNode rowFocusNode) builder;
-
-  const _SheetInitialFocus({required this.builder});
-
-  @override
-  State<_SheetInitialFocus> createState() => _SheetInitialFocusState();
-}
-
-class _SheetInitialFocusState extends State<_SheetInitialFocus> {
-  final FocusNode _rowFocusNode = FocusNode(debugLabel: 'sheet initial row');
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _rowFocusNode.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    _rowFocusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.builder(_rowFocusNode);
-}
-
-/// A bottom sheet that collects one whole number in a range.
-///
-/// Returns the accepted value via [Navigator.pop], so the caller decides what
-/// to persist and nothing is committed unless the user applies a valid entry.
-/// Stateful so the field's controller and focus node are disposed with the
-/// sheet rather than leaking on every open.
-class _NumericSheet extends StatefulWidget {
-  final String title;
-  final String hintText;
-  final int initialValue;
-  final int minValue;
-  final int maxValue;
-  final String errorMessage;
-  final AppColors colors;
-
-  const _NumericSheet({
-    required this.title,
-    required this.hintText,
-    required this.initialValue,
-    required this.minValue,
-    required this.maxValue,
-    required this.errorMessage,
-    required this.colors,
-  });
-
-  @override
-  State<_NumericSheet> createState() => _NumericSheetState();
-}
-
-class _NumericSheetState extends State<_NumericSheet> {
-  late final TextEditingController _controller;
-  final FocusNode _focusNode = FocusNode();
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: '${widget.initialValue}');
-    _selectAll();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  /// Selects the whole value so the next keystroke replaces it rather than
-  /// appending to it.
-  void _selectAll() {
-    _controller.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: _controller.text.length,
-    );
-  }
-
-  void _apply() {
-    final value = int.tryParse(_controller.text);
-    if (value == null || value < widget.minValue || value > widget.maxValue) {
-      // The sheet deliberately stays open: closing it would discard the value
-      // the user has just been asked to correct. The message is inline rather
-      // than a dialog so it matches the Font Size sheet and costs no keypress
-      // to dismiss.
-      setState(() => _error = widget.errorMessage);
-      _focusNode.requestFocus();
-      _selectAll();
-      return;
-    }
-    Navigator.pop(context, value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = widget.colors;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24, 16, 24,
-        MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Text(
-                widget.title,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colors.text,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onChanged: (_) {
-              if (_error != null) setState(() => _error = null);
-            },
-            onSubmitted: (_) => _apply(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 18),
-            decoration: InputDecoration(
-              hintText: widget.hintText,
-              errorText: _error,
-              filled: true,
-              fillColor: colors.buttonBackground,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(onPressed: _apply, child: const Text('Apply')),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The Font Size sheet: a numeric field and a slider that both edit the same
-/// value live, kept in sync with each other.
-///
-/// The field is autofocused with its value preselected, so the sheet is
-/// typeable the instant it opens -- no button, no second sheet to reach a
-/// keyboard. Field precedes the slider in the widget tree, so a single Tab
-/// from the field reaches the slider.
-class _FontSizeSheet extends StatefulWidget {
-  final AppSettings settings;
-  final AppColors colors;
-
-  const _FontSizeSheet({required this.settings, required this.colors});
-
-  @override
-  State<_FontSizeSheet> createState() => _FontSizeSheetState();
-}
-
-class _FontSizeSheetState extends State<_FontSizeSheet> {
-  late double _size;
-  late final TextEditingController _controller;
-  final FocusNode _focusNode = FocusNode();
-  String? _error;
-
-  /// One Enter can arrive twice -- once as a raw key event through the
-  /// sheet-level binding, once as a platform text input action through
-  /// onSubmitted. See framework_assumptions_test.dart. Without this the second
-  /// pop would dismiss whatever route is behind the sheet.
-  bool _closing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _size = widget.settings.fontSize;
-    _controller = TextEditingController(text: '${_size.round()}');
-    _selectAll();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  /// Selects the whole value so the next keystroke replaces it rather than
-  /// appending to it.
-  void _selectAll() {
-    _controller.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: _controller.text.length,
-    );
-  }
-
-  // Applies a valid value immediately, matching the slider. An invalid or
-  // incomplete value (e.g. "" while backspacing) is left un-applied and
-  // silent -- flashing an error on every keystroke would fight the user
-  // typing a number one digit at a time.
-  void _onFieldChanged(String text) {
-    final value = int.tryParse(text);
-    if (value != null && value >= minFontSize && value <= maxFontSize) {
-      setState(() {
-        _error = null;
-        _size = value.toDouble();
-      });
-      widget.settings.setFontSize(_size);
-    } else if (_error != null) {
-      setState(() => _error = null);
-    }
-  }
-
-  /// Commits the sheet. Reachable from Apply, from the field's own Enter, and
-  /// from the sheet-level Enter binding (which is how the slider commits).
-  void _apply() {
-    if (_closing) return;
-    final value = int.tryParse(_controller.text);
-    if (value == null || value < minFontSize || value > maxFontSize) {
-      setState(() => _error = 'Enter a size between 6 and 999 pt');
-      _focusNode.requestFocus();
-      _selectAll();
-      return;
-    }
-    // The value was already applied live by _onFieldChanged or _onSliderChanged.
-    _closing = true;
-    Navigator.pop(context, true);
-  }
-
-  void _onSliderChanged(double value) {
-    final rounded = value.roundToDouble();
-    setState(() {
-      _error = null;
-      _size = rounded;
-      _controller.text = '${rounded.round()}';
-      _selectAll();
-    });
-    widget.settings.setFontSize(rounded);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = widget.colors;
-    return CallbackShortcuts(
-      // The slider owns focus after a drag and ignores Enter, so without a
-      // sheet-level binding there is no way to commit from the keyboard once
-      // you have touched it.
-      bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.enter): _apply,
-        const SingleActivator(LogicalKeyboardKey.numpadEnter): _apply,
-      },
-      // Scrollable because this sheet is the tallest of the five: with the
-      // keyboard up on a short screen, the field, slider, scale labels and
-      // buttons together can exceed what is left. Scrolling degrades better
-      // than clipping the Apply button off the bottom.
-      child: SingleChildScrollView(
-      child: Padding(
-      // viewInsets.bottom lifts the sheet clear of the soft keyboard. The
-      // modal bottom sheet route does not do this for us -- it only clips to
-      // its layout box -- so a sheet with a focused field has to pad itself,
-      // exactly as _NumericSheet does. Pairs with isScrollControlled: true at
-      // the call site; without that this padding has no room to expand into.
-      padding: EdgeInsets.fromLTRB(
-        24, 16, 24,
-        MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Font Size',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colors.text,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onChanged: _onFieldChanged,
-            onSubmitted: (_) => _apply(),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: colors.text,
-            ),
-            decoration: InputDecoration(
-              suffixText: 'pt',
-              errorText: _error,
-              filled: true,
-              fillColor: colors.buttonBackground,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Slider(
-            value: _size.clamp(6, 144),
-            min: 6,
-            max: 144,
-            divisions: 138,
-            label: '${_size.round()}pt',
-            onChanged: _onSliderChanged,
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('6pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
-              Text('144pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(onPressed: _apply, child: const Text('Apply')),
-            ],
-          ),
-        ],
-      ),
-      ),
-      ),
-    );
-  }
-}
-
-/// The scrolling list of fonts.
-///
-/// Stateful so it can reveal the active font when the sheet opens. Rows past
-/// the viewport are built lazily, and a row that is never built can neither be
-/// seen nor take keyboard focus, so a font near the end of the list would
-/// otherwise be invisible and unreachable when its own picker opens.
-class _FontList extends StatefulWidget {
-  final ScrollController scrollController;
-  final String? selectedFamily;
-  final ValueChanged<String?> onSelected;
-
-  const _FontList({
-    required this.scrollController,
-    required this.selectedFamily,
-    required this.onSelected,
-  });
-
-  @override
-  State<_FontList> createState() => _FontListState();
-}
-
-class _FontListState extends State<_FontList> {
-  /// Enforced on the ListView below, so the offset arithmetic in
-  /// [_revealSelection] is exact by construction rather than an assumption
-  /// about how tall a ListTile happens to render.
-  static const double _tileExtent = 56;
-
-  static const List<String?> _options = [null, ...availableFonts];
-
-  final FocusNode _selectedNode = FocusNode(debugLabel: 'selected font');
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _revealSelection();
-      // The jump above changes which rows exist, so the selected row is only
-      // built on the frame after it. Requesting focus any earlier targets a node
-      // with no context. See _SheetInitialFocus for why autofocus is not enough.
-      await WidgetsBinding.instance.endOfFrame;
-      if (mounted) _selectedNode.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    _selectedNode.dispose();
-    super.dispose();
-  }
-
-  void _revealSelection() {
-    final index = _options.indexOf(widget.selectedFamily);
-    if (!mounted || index <= 0) return;
-    final controller = widget.scrollController;
-    if (!controller.hasClients) return;
-    controller.jumpTo(
-      (index * _tileExtent).clamp(
-        controller.position.minScrollExtent,
-        controller.position.maxScrollExtent,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      controller: widget.scrollController,
-      itemExtent: _tileExtent,
-      itemCount: _options.length,
-      itemBuilder: (context, index) {
-        final family = _options[index];
-        final selected = family == widget.selectedFamily;
-        return _FontTile(
-          label: family ?? 'Source Code Pro (Default)',
-          style: GoogleFonts.getFont(family ?? 'Source Code Pro'),
-          selected: selected,
-          focusNode: selected ? _selectedNode : null,
-          onTap: () => widget.onSelected(family),
-        );
-      },
-    );
-  }
-}
-
-class _FontTile extends StatelessWidget {
-  final String label;
-  final TextStyle style;
-  final bool selected;
-  final FocusNode? focusNode;
-  final VoidCallback onTap;
-
-  const _FontTile({
-    required this.label,
-    required this.style,
-    required this.selected,
-    required this.focusNode,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      // Opening on the active row lets arrow keys navigate from where the user
-      // already is. The initial focus claim is explicit rather than autofocus --
-      // see _SheetInitialFocus.
-      focusNode: focusNode,
-      title: Text(label, style: style),
-      trailing: selected ? const Icon(Icons.check) : null,
-      selected: selected,
-      onTap: onTap,
-    );
-  }
-}
-
-class _ToolbarButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final AppColors colors;
-  final VoidCallback onPressed;
-
-  const _ToolbarButton({
-    required this.icon,
-    required this.tooltip,
-    required this.colors,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: colors.buttonBackground,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(icon, color: colors.buttonIcon, size: 24),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AboutBodyText extends StatelessWidget {
-  final String text;
-  final AppColors colors;
-
-  const _AboutBodyText(this.text, {required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        color: colors.text,
-        fontSize: 16,
-        height: 1.4,
-      ),
-    );
-  }
-}
-
-class _AboutStudy extends StatelessWidget {
-  final String title;
-  final String body;
-  final String citation;
-  final AppColors colors;
-
-  const _AboutStudy({
-    required this.title,
-    required this.body,
-    required this.citation,
-    required this.colors,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            color: colors.text,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          body,
-          style: TextStyle(
-            color: colors.text,
-            fontSize: 16,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          citation,
-          style: TextStyle(
-            color: colors.textSecondary,
-            fontSize: 13,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-        const SizedBox(height: 24),
-      ],
     );
   }
 }
