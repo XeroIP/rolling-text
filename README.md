@@ -146,7 +146,7 @@ Have an idea for Rolling Text? Feature requests are welcome on the [GitHub Issue
 
 ## Contributing
 
-Contributions are welcome! Open an issue or submit a pull request on [GitHub](https://github.com/XeroIP/rolling-text).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, testing, and commit conventions, then open an issue or pull request on [GitHub](https://github.com/XeroIP/rolling-text).
 
 ## License
 

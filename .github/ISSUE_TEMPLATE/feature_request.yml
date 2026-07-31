@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an idea for Rolling Text
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is awkward or missing today? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: What should the app do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: premise
+    attributes:
+      label: How it fits the premise
+      description: >
+        Rolling Text exists so that what you write is not kept. Settings persist; text never does.
+        If your idea touches the editor's text, explain how it works without saving, transmitting, or
+        recovering what was written.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms this applies to
+      multiple: true
+      options:
+        - Android
+        - iOS
+        - Web
+    validations:
+      required: false
