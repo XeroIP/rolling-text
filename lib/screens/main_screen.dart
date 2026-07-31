@@ -124,7 +124,7 @@ class _MainScreenState extends State<MainScreen> {
   void _onTextChanged(String text, AppSettings settings) {
     if (_isEnforcing) return;
 
-    if (text.runes.length > settings.maxChars) {
+    if (text.characters.length > settings.maxChars) {
       _isEnforcing = true;
       final trimmed = truncateRollingText(text, settings.maxChars);
       _controller.value = TextEditingValue(
@@ -133,7 +133,7 @@ class _MainScreenState extends State<MainScreen> {
       );
       _isEnforcing = false;
     }
-    _charCount.value = _controller.text.runes.length;
+    _charCount.value = _controller.text.characters.length;
   }
 
   TextStyle _textStyle(AppSettings settings) {
