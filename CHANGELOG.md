@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-07-31
+
+### Fixed
+- **Release builds could silently sign with the debug keystore** - If `key.properties` was missing, Android release builds fell back to debug signing instead of failing, which would have produced a release artifact unable to receive normal upgrades from a properly-signed release; release builds now fail with a clear error instead, while debug and profile builds are unaffected
+- **Documented iOS minimum version overstated compatibility** - The README claimed iOS 12.0+ while the Xcode project's deployment target is 13.0; the badge now matches
+
+### Security
+- **Pinned third-party GitHub Actions to immutable commit SHAs** - Workflow actions previously floated on mutable version tags while the release workflow has write access and handles signing secrets; a new CI policy check now rejects any `uses:` reference that isn't pinned to a 40-character commit SHA
+
+### Known Issues
+- **iOS is untested on hardware** - It takes the same code path as Android, which was verified on a Pixel 8 Pro
+
+---
+
 ## [0.5.3] - 2026-07-30
 
 ### Added
