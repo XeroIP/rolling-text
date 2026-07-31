@@ -46,7 +46,7 @@ Lowering the limit below what you have already written removes the oldest charac
 ## Features
 
 - **Configurable character limit** - Set anywhere from 1 to 25,000 characters
-- **Themes** - Light, Dark, and Sepia
+- **Themes** - Light, Dark, Sepia, Night, and Dark Sepia
 - **Font picker** - Choose from 20 curated Google Fonts, or Source Code Pro as the default. Uncached fonts require an internet connection on first use.
 - **Adjustable font size** - Type any size from 6pt to 999pt, or drag the slider for 6pt to 144pt
 - **Keyboard operation** - Every settings sheet works without a mouse: arrow keys move between themes and fonts, Enter applies, Escape closes, and arrow or page keys scroll the About text. Focus returns to the editor when a sheet closes, when you tap elsewhere in the app, or when you switch back to the app after leaving it.
