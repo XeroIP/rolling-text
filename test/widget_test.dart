@@ -346,7 +346,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Please enter a number between 1 and 1,000,000'),
+        find.text('Please enter a number between $minMaxChars and $maxMaxChars'),
         findsOneWidget,
         reason: 'the error is inline, matching the Font Size sheet',
       );

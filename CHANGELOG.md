@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-07-31
+
+### Fixed
+- **Character Limit sheet showed the wrong maximum** - Its hint text and validation error still said "1,000,000" after 0.5.5 lowered the real ceiling to 25,000; both now read from the same constant the app actually enforces
+
+### Known Issues
+- **iOS is untested on hardware** - It takes the same code path as Android, which was verified on a Pixel 8 Pro
+
+---
+
 ## [0.5.5] - 2026-07-31
 
 ### Changed
