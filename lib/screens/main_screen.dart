@@ -361,15 +361,16 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'Select Theme',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: colors.text,
+                        Expanded(
+                          child: Text(
+                            'Select Theme',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: colors.text,
+                            ),
                           ),
                         ),
-                        const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => Navigator.pop(ctx),
@@ -432,15 +433,16 @@ class _MainScreenState extends State<MainScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
                 child: Row(
                   children: [
-                    Text(
-                      'Select Font',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: colors.text,
+                    Expanded(
+                      child: Text(
+                        'Select Font',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: colors.text,
+                        ),
                       ),
                     ),
-                    const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(ctx),
@@ -531,15 +533,25 @@ class _MainScreenState extends State<MainScreen> {
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
               child: Row(
                 children: [
-                  Text(
-                    'About Rolling Text',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: colors.text,
+                  Expanded(
+                    // The body below scrolls in its own ListView, but this
+                    // header sits outside it, so an unbounded title could grow
+                    // tall enough at a large text scale to overflow the sheet's
+                    // fixed height on its own. Capped so the header's height
+                    // stays predictable regardless of scale; a screen reader
+                    // still announces the full string via this Text's own
+                    // semantics node even when visually truncated.
+                    child: Text(
+                      'About Rolling Text',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: colors.text,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.pop(ctx),
@@ -832,69 +844,79 @@ class _NumericSheetState extends State<_NumericSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = widget.colors;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24, 16, 24,
-        MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Text(
-                widget.title,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colors.text,
+    // Scrollable for the same reason as _FontSizeSheet: viewInsets.bottom
+    // below lifts the sheet clear of the soft keyboard, and at a large
+    // accessibility text scale the header, field and buttons together can
+    // exceed what is left. Pairs with isScrollControlled: true at the call
+    // site; without that this has no room to expand into.
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24, 16, 24,
+          MediaQuery.of(context).viewInsets.bottom + 32,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: colors.text,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onChanged: (_) {
+                if (_error != null) setState(() => _error = null);
+              },
+              onSubmitted: (_) => _apply(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                errorText: _error,
+                filled: true,
+                fillColor: colors.buttonBackground,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
               ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            autofocus: true,
-            textInputAction: TextInputAction.done,
-            onChanged: (_) {
-              if (_error != null) setState(() => _error = null);
-            },
-            onSubmitted: (_) => _apply(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 18),
-            decoration: InputDecoration(
-              hintText: widget.hintText,
-              errorText: _error,
-              filled: true,
-              fillColor: colors.buttonBackground,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(onPressed: _apply, child: const Text('Apply')),
-            ],
-          ),
-        ],
+            const SizedBox(height: 16),
+            OverflowBar(
+              alignment: MainAxisAlignment.end,
+              spacing: 8,
+              overflowAlignment: OverflowBarAlignment.end,
+              overflowSpacing: 8,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(onPressed: _apply, child: const Text('Apply')),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1028,15 +1050,16 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
         children: [
           Row(
             children: [
-              Text(
-                'Font Size',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colors.text,
+              Expanded(
+                child: Text(
+                  'Font Size',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: colors.text,
+                  ),
                 ),
               ),
-              const Spacer(),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
@@ -1082,19 +1105,29 @@ class _FontSizeSheetState extends State<_FontSizeSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('6pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
-              Text('144pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+              Flexible(
+                child: Text('6pt', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+              ),
+              Flexible(
+                child: Text(
+                  '144pt',
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                  textAlign: TextAlign.right,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            overflowAlignment: OverflowBarAlignment.end,
+            overflowSpacing: 8,
             children: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Cancel'),
               ),
-              const SizedBox(width: 8),
               FilledButton(onPressed: _apply, child: const Text('Apply')),
             ],
           ),

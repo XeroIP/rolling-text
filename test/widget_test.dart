@@ -787,6 +787,93 @@ void main() {
     });
   });
 
+  group('sheet headers remain usable at large text scale', () {
+    /// Narrow phone width plus a 300% accessibility text scale -- the
+    /// combination #22 was filed against, where a fixed title-and-close-button
+    /// row can overflow instead of the title wrapping.
+    Future<void> pumpNarrowAndScaled(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      tester.platformDispatcher.textScaleFactorTestValue = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await _pumpMainScreen(tester);
+    }
+
+    void expectCloseButtonUsable(WidgetTester tester) {
+      expect(tester.takeException(), isNull, reason: 'no overflow at this scale');
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      final closeButtonSize = tester.getSize(find.byIcon(Icons.close));
+      expect(
+        closeButtonSize.width,
+        greaterThan(0),
+        reason: 'the close icon has nonzero layout size, not clipped to nothing',
+      );
+    }
+
+    testWidgets('the theme sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.palette_outlined));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Select Theme'), findsNothing);
+    });
+
+    testWidgets('the font sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Select Font'), findsNothing);
+    });
+
+    testWidgets('the about sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('About Rolling Text'), findsNothing);
+    });
+
+    testWidgets('the character limit sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.tune));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Character Limit'), findsNothing);
+    });
+
+    testWidgets('the font size sheet does', (tester) async {
+      await pumpNarrowAndScaled(tester);
+
+      await tester.tap(find.byIcon(Icons.format_size));
+      await tester.pumpAndSettle();
+
+      expectCloseButtonUsable(tester);
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Font Size'), findsNothing);
+    });
+  });
+
   group('about sheet is readable from the keyboard', () {
     Future<ScrollableState> openAbout(WidgetTester tester) async {
       await tester.tap(find.byIcon(Icons.info_outline));
