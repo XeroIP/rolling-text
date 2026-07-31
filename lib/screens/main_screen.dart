@@ -289,11 +289,11 @@ class _MainScreenState extends State<MainScreen> {
       isScrollControlled: true,
       builder: (ctx) => _NumericSheet(
         title: 'Character Limit',
-        hintText: '1 – 1,000,000',
+        hintText: '$minMaxChars – $maxMaxChars',
         initialValue: settings.maxChars,
         minValue: minMaxChars,
         maxValue: maxMaxChars,
-        errorMessage: 'Please enter a number between 1 and 1,000,000',
+        errorMessage: 'Please enter a number between $minMaxChars and $maxMaxChars',
         colors: colorsFor(settings.theme),
       ),
     );
