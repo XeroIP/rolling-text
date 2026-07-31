@@ -1,0 +1,28 @@
+name: Policy - pinned actions
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Reject unpinned third-party actions
+        run: |
+          fail=0
+          while IFS=: read -r file line ref; do
+            action="${ref%@*}"
+            version="${ref##*@}"
+            version="${version%% *}"
+            if ! echo "$version" | grep -qE '^[0-9a-f]{40}$'; then
+              echo "::error file=$file,line=$line::'$action' is pinned to '$version', not an immutable commit SHA"
+              fail=1
+            fi
+          done < <(grep -rnoE 'uses:\s*[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[A-Za-z0-9._-]+' .github/workflows --include='*.yml' | sed -E 's/uses:[[:space:]]*//')
+          exit "$fail"

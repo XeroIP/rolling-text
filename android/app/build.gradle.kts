@@ -47,13 +47,27 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                // Fall back to debug signing if key.properties doesn't exist
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
+    }
+}
+
+// Configuration runs for every variant regardless of which task is invoked, so a debug
+// or profile build must not be blocked by a missing release keystore. Only fail once the
+// task graph is known to actually contain a release assemble/bundle task.
+gradle.taskGraph.whenReady {
+    val buildingRelease = allTasks.any {
+        it.name.startsWith("assembleRelease") || it.name.startsWith("bundleRelease")
+    }
+    if (buildingRelease && !keystorePropertiesFile.exists()) {
+        throw GradleException(
+            "Release build requested but android/key.properties is missing, so there is " +
+            "no release signing key to sign the APK/AAB with. Falling back to debug " +
+            "signing would produce a release artifact that can't receive normal upgrades " +
+            "from a properly-signed release. Create android/key.properties (see " +
+            "android/app/build.gradle.kts for the expected keys) or build a debug/profile " +
+            "variant instead."
+        )
     }
 }
 
