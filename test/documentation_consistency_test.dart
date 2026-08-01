@@ -1,11 +1,12 @@
 // Guards documented facts against the code that actually backs them.
 //
-// README.md has twice advertised a number the app no longer enforced -- the
-// character limit stayed at 1,000,000 after the real ceiling dropped to
-// 25,000, and the Themes list named three themes after a fourth and fifth
-// shipped. Both were only caught by a manual audit; this test makes that
-// audit automatic. A failure here means a doc went stale, not that the test
-// is wrong -- fix the doc.
+// The feature list -- now docs/user-guide.md, previously README.md -- has
+// twice advertised a number the app no longer enforced: the character limit
+// stayed at 1,000,000 after the real ceiling dropped to 25,000, and the
+// Themes list named three themes after a fourth and fifth shipped. Both were
+// only caught by a manual audit; this test makes that audit automatic. A
+// failure here means a doc went stale, not that the test is wrong -- fix the
+// doc.
 
 import 'dart:io';
 
@@ -18,7 +19,8 @@ import 'package:rolling_text/theme/app_theme.dart';
 String _readFile(String path) =>
     File(path).readAsStringSync().replaceAll('\r\n', '\n');
 
-String _readmeText() => _readFile('README.md');
+/// The user-facing feature list. The bullets checked below live here.
+const _userGuide = 'docs/user-guide.md';
 
 /// Same grouping a reader uses: digits from the right, in threes.
 String _withThousandsSeparator(int value) {
@@ -31,40 +33,42 @@ String _withThousandsSeparator(int value) {
   return buffer.toString();
 }
 
-/// Text of the bold bullet starting with `- **[label]**` in README.md, up to
-/// the end of that line. Fails with the label name if the bullet is gone or
-/// renamed, rather than silently matching nothing.
-String _readmeBullet(String label) {
+/// Text of the bold bullet starting with `- **[label]**` in [path], up to the
+/// end of that line. Fails with the label name if the bullet is gone or
+/// renamed, rather than silently matching nothing -- which is also what keeps
+/// a wrong [path] from passing vacuously.
+String _bullet(String path, String label) {
   final pattern = RegExp('- \\*\\*$label\\*\\*[^\\n]*');
-  final match = pattern.firstMatch(_readmeText());
+  final match = pattern.firstMatch(_readFile(path));
   expect(
     match,
     isNotNull,
-    reason: 'README.md has no "- **$label**" bullet to check against '
-        '$label -- did it get renamed?',
+    reason: '$path has no "- **$label**" bullet to check against '
+        '$label -- did it get renamed or moved to another file?',
   );
   return match!.group(0)!;
 }
 
 void main() {
-  group('README claims that must match app_settings.dart / app_theme.dart', () {
+  group('Documented claims that must match app_settings.dart / app_theme.dart',
+      () {
     test('character limit matches minMaxChars/maxMaxChars', () {
-      final bullet = _readmeBullet('Configurable character limit');
+      final bullet = _bullet(_userGuide, 'Configurable character limit');
       expect(
         bullet,
         contains(
           'from $minMaxChars to ${_withThousandsSeparator(maxMaxChars)} characters',
         ),
         reason:
-            'The README character limit no longer matches maxMaxChars in '
-            'lib/models/app_settings.dart. This is exactly how the README '
+            'The $_userGuide character limit no longer matches maxMaxChars in '
+            'lib/models/app_settings.dart. This is exactly how the docs '
             'once advertised 1,000,000 after the real ceiling dropped to '
-            '25,000 -- update the README bullet, not this test.',
+            '25,000 -- update the user guide bullet, not this test.',
       );
     });
 
     test('theme list matches AppTheme.values', () {
-      final bullet = _readmeBullet('Themes');
+      final bullet = _bullet(_userGuide, 'Themes');
       final listed = bullet
           .replaceFirst('- **Themes** - ', '')
           .split(RegExp(r',\s*(?:and\s+)?|\s+and\s+'))
@@ -77,33 +81,33 @@ void main() {
         listed,
         equals(actual),
         reason:
-            'The README Themes bullet lists $listed but AppTheme.values in '
-            'lib/theme/app_theme.dart has $actual. This is exactly how the '
-            'README once undercounted the themes after Night and Dark Sepia '
-            'shipped -- update the README bullet, not this test.',
+            'The $_userGuide Themes bullet lists $listed but AppTheme.values '
+            'in lib/theme/app_theme.dart has $actual. This is exactly how the '
+            'docs once undercounted the themes after Night and Dark Sepia '
+            'shipped -- update the user guide bullet, not this test.',
       );
     });
 
     test('font count matches availableFonts.length', () {
-      final bullet = _readmeBullet('Font picker');
+      final bullet = _bullet(_userGuide, 'Font picker');
       expect(
         bullet,
         contains('${availableFonts.length} curated Google Fonts'),
         reason:
-            'The README font count no longer matches availableFonts.length '
-            'in lib/models/app_settings.dart.',
+            'The $_userGuide font count no longer matches '
+            'availableFonts.length in lib/models/app_settings.dart.',
       );
     });
 
     test('font size range matches minFontSize/maxFontSize/maxSliderFontSize', () {
-      final bullet = _readmeBullet('Adjustable font size');
+      final bullet = _bullet(_userGuide, 'Adjustable font size');
       expect(
         bullet,
         contains(
           '${minFontSize.round()}pt to ${maxFontSize.round()}pt',
         ),
         reason:
-            'The numeric field range in the README no longer matches '
+            'The numeric field range in $_userGuide no longer matches '
             'minFontSize/maxFontSize in lib/models/app_settings.dart.',
       );
       expect(
@@ -112,7 +116,7 @@ void main() {
           'slider for ${minFontSize.round()}pt to ${maxSliderFontSize.round()}pt',
         ),
         reason:
-            'The slider range in the README no longer matches '
+            'The slider range in $_userGuide no longer matches '
             'minFontSize/maxSliderFontSize in lib/models/app_settings.dart.',
       );
     });
@@ -146,11 +150,17 @@ void main() {
       );
     });
 
-    test('README, CONTRIBUTING.md, and CLAUDE.md all state the pinned Flutter version', () {
+    test('every doc that names the toolchain states the pinned Flutter version',
+        () {
       final version =
           flutterVersionFrom('.github/workflows/build-release.yml');
 
-      for (final path in ['README.md', 'CONTRIBUTING.md', 'CLAUDE.md']) {
+      for (final path in [
+        'README.md',
+        'CONTRIBUTING.md',
+        'CLAUDE.md',
+        'docs/releasing.md',
+      ]) {
         expect(
           _readFile(path),
           contains(version),
@@ -181,7 +191,7 @@ void main() {
           .where((name) => name != 'flutter')
           .toSet();
 
-      final bullet = _readmeBullet('Dependencies');
+      final bullet = _bullet('README.md', 'Dependencies');
       final readmeDeps = RegExp(r'`([a-zA-Z0-9_]+)`')
           .allMatches(bullet)
           .map((m) => m.group(1)!)
