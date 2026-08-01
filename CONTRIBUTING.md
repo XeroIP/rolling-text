@@ -36,7 +36,7 @@ Add an entry to the `## [Unreleased]` section of [`CHANGELOG.md`](CHANGELOG.md).
 
 **Keep every bullet on one unbroken line.** GitHub's release renderer preserves mid-bullet newlines as visible line breaks instead of reflowing them, so a hard-wrapped bullet publishes as broken release notes.
 
-Do not bump the version in `pubspec.yaml` in a feature PR. Versioning happens at release time, where the git tag, the `pubspec.yaml` version, and a matching `CHANGELOG.md` section all have to agree or the release workflow fails. See [Releasing](README.md#releasing).
+Do not bump the version in `pubspec.yaml` in a feature PR. Versioning happens at release time, where the git tag, the `pubspec.yaml` version, and a matching `CHANGELOG.md` section all have to agree or the release workflow fails. See [Releasing](docs/releasing.md).
 
 ## Editing workflows
 

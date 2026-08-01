@@ -10,7 +10,7 @@ Editor text is never persisted, transmitted, or recovered. Only four settings re
 
 ## Limits live in exactly one place
 
-`lib/models/app_settings.dart` declares `minMaxChars`, `maxMaxChars`, `minFontSize`, and `maxFontSize`. Sheets and validators must read those constants — never hardcode the numbers, and never restate them in the README without checking. Duplicating the limit is what caused the 0.5.6 bug, where the Character Limit sheet still advertised 1,000,000 after the ceiling dropped to 25,000.
+`lib/models/app_settings.dart` declares `minMaxChars`, `maxMaxChars`, `minFontSize`, and `maxFontSize`. Sheets and validators must read those constants — never hardcode the numbers, and never restate them in `docs/user-guide.md` without checking. Duplicating the limit is what caused the 0.5.6 bug, where the Character Limit sheet still advertised 1,000,000 after the ceiling dropped to 25,000.
 
 The ceiling is 25,000 for a reason: `EditableText` does not virtualize. It lays out every glyph in the field, so a higher ceiling makes every keystroke shape the whole buffer through the font pipeline.
 
@@ -39,7 +39,7 @@ Flutter is pinned to **3.44.8** in both workflows. A different local version res
 - `test/framework_assumptions_test.dart` is a tripwire, not a unit test. It asserts Flutter defaults the app deliberately does not reimplement — Escape dismissal, arrow-key focus traversal, scroll-into-view. If it fails after an SDK upgrade, restore the behaviour in `main_screen.dart`. Do not delete the test.
 - `test/android_manifest_test.dart` guards `INTERNET` in the release manifest. Debug manifests grant it automatically for hot reload, so removing it breaks uncached Google Fonts downloads in release builds only.
 - `test/widget_test.dart`'s `_pumpMainScreen` builds `AppSettings` from explicit parameters and never calls `loadInto`, so preference-loading behaviour is covered separately in `preferences_service_test.dart`.
-- `test/documentation_consistency_test.dart` fails when a number or fact in `README.md`, `CONTRIBUTING.md`, or `CLAUDE.md` stops matching the constant, enum, or config file it describes — this is what caught the README once advertising a 1,000,000 character limit and a three-theme list after both had changed. A failure means the doc is stale; fix the doc, not the test.
+- `test/documentation_consistency_test.dart` fails when a number or fact in `docs/user-guide.md`, `docs/releasing.md`, `README.md`, `CONTRIBUTING.md`, or `CLAUDE.md` stops matching the constant, enum, or config file it describes — this is what caught the feature list once advertising a 1,000,000 character limit and a three-theme list after both had changed. The guarded feature bullets live in `docs/user-guide.md`; the `Dependencies` bullet is in `README.md`. A failure means the doc is stale; fix the doc, not the test.
 
 ## Layout
 
