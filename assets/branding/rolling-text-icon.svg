@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 <rect x="0" y="0" width="512" height="512" rx="120" fill="oklch(0.24 0.02 195)"></rect>
-<rect x="159" y="179" width="14" height="154" rx="1" fill="oklch(0.75 0.09 195)" opacity="0.12"></rect>
-<rect x="195" y="179" width="14" height="154" rx="1" fill="oklch(0.75 0.09 195)" opacity="0.22"></rect>
-<rect x="231" y="179" width="14" height="154" rx="1" fill="oklch(0.75 0.09 195)" opacity="0.4"></rect>
-<rect x="267" y="179" width="14" height="154" rx="1" fill="oklch(0.75 0.09 195)" opacity="0.6"></rect>
-<rect x="303" y="179" width="14" height="154" rx="1" fill="oklch(0.8 0.1 195)" opacity="0.8"></rect>
-<rect x="339" y="179" width="14" height="154" rx="1" fill="oklch(0.97 0.01 195)"></rect>
+<rect x="82" y="125" width="38" height="262" rx="5" fill="oklch(0.42 0.03 195)" opacity="0.5"></rect>
+<rect x="144" y="125" width="38" height="262" rx="5" fill="oklch(0.52 0.05 195)" opacity="0.62"></rect>
+<rect x="206" y="125" width="38" height="262" rx="5" fill="oklch(0.62 0.07 195)" opacity="0.74"></rect>
+<rect x="268" y="125" width="38" height="262" rx="5" fill="oklch(0.72 0.085 195)" opacity="0.84"></rect>
+<rect x="330" y="125" width="38" height="262" rx="5" fill="oklch(0.82 0.095 195)" opacity="0.93"></rect>
+<rect x="392" y="125" width="38" height="262" rx="5" fill="oklch(0.97 0.01 195)"></rect>
 </svg>
