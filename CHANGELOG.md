@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-09-02
+## [0.6.1] - 2026-09-02
 
 ### Changed
 - **App icon redesigned** - The rolling-bars mark's bars are now wider, taller, and extend closer to the icon's edges, reading more clearly at small sizes than the original thin-bar version from 0.5.5; regenerated across iOS, Android, and Web
