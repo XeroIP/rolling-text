@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-02
+
+### Changed
+- **App icon redesigned** - The rolling-bars mark's bars are now wider, taller, and extend closer to the icon's edges, reading more clearly at small sizes than the original thin-bar version from 0.5.5; regenerated across iOS, Android, and Web
+
 ### Removed
 - **The superseded native Android codebase** - `android-legacy/` held the pre-Flutter app, including setup and contributing docs that still told a reader to install Android Studio and JDK 8; the native code remains available at tag [`v2.1-2`](https://github.com/XeroIP/rolling-text/tree/v2.1-2)
 
