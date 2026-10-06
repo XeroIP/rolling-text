@@ -66,7 +66,8 @@ release-key
 android/key.properties
 
 # Claude-specific
-.claude/
+.claude/*
+!.claude/commands/
 
 # Antigravity agent-specific
 .agents/
