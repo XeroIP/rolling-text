@@ -1,29 +1,34 @@
 ---
 state: active        # active | paused | blocked | done
 priority: med        # high | med | low
-updated: 2026-10-06T18:37:11-06:00
+updated: 2026-10-07T00:06:39-06:00
 source: manual       # manual (/wrapup or pre-push) | auto (sweeper)
 ---
 # rolling-text status
 
 ## Goal
-Keep the app releasable and choose the next piece of work: post the launch drafts, or start the Raspberry Pi edition (issue #49). The goal is inferred from repo state; the owner has not stated it in a STATUS.md.
+Work through the six issues filed from the October code review (#60-#65), starting with the one that affects the launch posts. Issue #49 (Raspberry Pi edition) still needs design discussion.
 
 ## Done recently
-- Added the shift-change handoff: STATUS.md template and the /wrapup skill (9e06c08).
-- Corrected the icon release version to 0.6.1 instead of 0.7.0 (52f504c, PR #58).
-- Redesigned the app icon bars and regenerated platform icons (b71b4a1, ce78579).
-- Release audit, read-only: `pubspec.yaml` 0.6.1+10, newest released CHANGELOG heading `## [0.6.1]` and tag `v0.6.1` agree.
-- Added `docs/launch-posts.md` (PR #59) and deleted three old tags and their releases.
+- Reviewed an external code review (ten findings, three nits) and two later triage passes against `main`; no code was changed. `flutter analyze` is clean and all 94 tests pass on Flutter 3.44.8.
+- Filed #60 (template metadata), #61 (CI on pull requests and before web deploy), #62 (resume focus steal, thrown saves, write on cancel, version lookup), #63 (dark-theme contrast), #64 (hardcoded font-size limits, duplicate font row), #65 (blank page when browser storage is blocked).
+- Reproduced #62 in Chrome on a debug build: after a resume with a sheet open, typed keys go to the editor behind it and Escape stops closing the sheet. The resume was simulated with `blur`/`focus` events on `window`.
+- Reproduced #65 in headless Chrome with a throwaway profile that blocks site data: reading `localStorage` throws `SecurityError` and the page stays blank.
+- Read the `[Unreleased]` section of `CHANGELOG.md`: it is empty.
 
 ## In progress / broken
-- Nothing is known to be broken. `main` matches `origin/main`.
-- `docs/launch-posts.md` is merged to `main` (PR #59, squash `d0c5b5e`): Show HN post, Reddit template, 14-subreddit list. Whether and where to post is the owner's call; the "no analytics" claim in the posts and the 78-character HN title were not independently verified.
-- Old tags `v3.0.0`, `v2.1-2` and `v2.0` and their three GitHub Releases (two had one attached file each) were deleted at the owner's request. `v0.6.1` is the newest tag and release.
-- `CHANGELOG.md` has an `[Unreleased]` section whose contents were not read.
+- Nothing is in progress. `main` matches `origin/main`; no branches are open.
+- Known defects on `main` are the six issues above. #62 is destructive (stray keys at the limit delete text) and #65 stops the web app from starting.
+- `docs/launch-posts.md` is not posted yet. Its "no analytics" claim and 78-character HN title are still unverified, and link previews would show the template metadata until #60 lands.
+- `review/` is untracked and holds the triage handoff. The repo is public, so committing it publishes the findings. A local-only branch `review/codex-2026-08-02` holds the original review.
+- Not confirmed by hand: #62 with a real window switch, #62 on Android, and whether a key typed immediately after opening a sheet can land in the editor in a visible window (both noted in comments on #62).
 
 ## Next step
-Read the `[Unreleased]` section of `CHANGELOG.md`, then ask the owner whether to open design discussion on issue #49 (Raspberry Pi edition).
+Fix #60 on a new branch: in `web/index.html` set the title (line 32) and `apple-mobile-web-app-title` (line 26) to `Rolling Text` and the meta description (line 21) to the one in `web/manifest.json`; in `android/app/src/main/AndroidManifest.xml` line 5 set `android:label="Rolling Text"`. Then #61, #62 with #65, #63, #64.
 
 ## Blockers / waiting on
-- Owner decision: issue #49 (Raspberry Pi edition, open, needs design discussion before any implementation).
+- Owner decision: remove the `orientation` lock in `web/manifest.json` as part of #60, or keep portrait.
+- Owner decision: final colors for #63 (Dark Sepia primary text probably needs brightening too).
+- Owner decision: whether the "Nothing is stored" wording changes, given four settings persist.
+- Owner decision: commit or delete `review/` and the local review branch now that the issues exist.
+- Owner decision: issue #49 design discussion.
