@@ -1,7 +1,7 @@
 ---
 state: active        # active | paused | blocked | done
 priority: med        # high | med | low
-updated: 2026-10-07T00:10:29-06:00
+updated: 2026-10-07T00:15:01-06:00
 source: manual       # manual (/wrapup or pre-push) | auto (sweeper)
 ---
 # rolling-text status
@@ -15,6 +15,7 @@ Work through the six issues filed from the October code review (#60-#65), starti
 - Reproduced #62 in Chrome on a debug build: after a resume with a sheet open, typed keys go to the editor behind it and Escape stops closing the sheet. The resume was simulated with `blur`/`focus` events on `window`.
 - Reproduced #65 in headless Chrome with a throwaway profile that blocks site data: reading `localStorage` throws `SecurityError` and the page stays blank.
 - Read the `[Unreleased]` section of `CHANGELOG.md`: it is empty.
+- Posted two comments on #62 (a keystroke race when a sheet opens, and possible Android impact); both are marked unconfirmed there.
 
 ## In progress / broken
 - Nothing is in progress. `main` matches `origin/main`; no branches are open.
