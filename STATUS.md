@@ -1,7 +1,7 @@
 ---
 state: active        # active | paused | blocked | done
 priority: med        # high | med | low
-updated: 2026-10-06T18:24:46-06:00
+updated: 2026-10-06T18:29:45-06:00
 source: manual       # manual (/wrapup or pre-push) | auto (sweeper)
 ---
 # rolling-text status
@@ -18,13 +18,14 @@ Keep the app releasable and choose the next piece of work: publish the launch po
 
 ## In progress / broken
 - Nothing is known to be broken. `main` matches `origin/main`.
-- `docs/launch-posts.md` is untracked: 149 lines, copy-paste drafts (a Show HN post is first) with bracketed notes still to edit. Only the first 15 lines were read; completeness is unchecked.
-- `git tag --sort=-v:refname` lists `v3.0.0`, `v2.1-2` and `v2.0` above `v0.6.1`. Their origin is unknown. They did not affect the 0.6.1 audit, but they would affect any "latest tag" check.
+- `docs/launch-posts.md` is untracked: 149 lines, copy-paste drafts (a Show HN post is first). Read in full: Show HN post, Reddit template, and a 14-subreddit list; ready to post apart from the two issues below.
+- Old tags `v3.0.0`, `v2.1-2` and `v2.0` (Feb 2026, commits 3789d99, 98ad443, b43e1f5) were deleted locally and on origin at the owner's request. Their three GitHub Releases remain as untagged drafts; delete them in the Releases UI or with `gh release delete` if unwanted. `v0.6.1` is now the newest tag.
+- `docs/launch-posts.md` line 3 mentions bracketed notes that do not exist, and line 144 implies a Play Store listing that nothing in the repo confirms.
 - `CHANGELOG.md` has an `[Unreleased]` section whose contents were not read.
 
 ## Next step
-Read `docs/launch-posts.md` in full, resolve its bracketed notes, then commit it on a `docs/` branch (not `main`) and open a PR.
+Fix the stale header line and the Play Store mention in `docs/launch-posts.md`, then commit it on a `docs/` branch (not `main`) and open a PR.
 
 ## Blockers / waiting on
 - Owner decision: launch posts first, or issue #49 (Raspberry Pi edition, open, needs design discussion before any implementation).
-- Owner to say whether the stray `v3.0.0`, `v2.1-2` and `v2.0` tags are intentional.
+- Owner to say whether the three draft releases left by the tag deletion should be removed.
