@@ -1,7 +1,7 @@
 ---
 state: active        # active | paused | blocked | done
 priority: med        # high | med | low
-updated: 2026-10-07T00:08:17-06:00
+updated: 2026-10-07T00:10:29-06:00
 source: manual       # manual (/wrapup or pre-push) | auto (sweeper)
 ---
 # rolling-text status
@@ -21,6 +21,7 @@ Work through the six issues filed from the October code review (#60-#65), starti
 - Known defects on `main` are the six issues above. #62 is destructive (stray keys at the limit delete text) and #65 stops the web app from starting.
 - `docs/launch-posts.md` is not posted yet. Its "no analytics" claim and 78-character HN title are still unverified, and link previews would show the template metadata until #60 lands.
 - The untracked `review/` directory and the local-only branch `review/codex-2026-08-02` (commit `4aa638a`) were deleted at the owner's request; issues #60-#65 are now the only record of the review.
+- To re-check web fixes in a browser: serve with `flutter run -d web-server --no-pub` (`-d chrome` opens a separate profile that browser automation cannot reach). An automated tab can report `visibilityState` "hidden", which throttles frames to about one per second, so wait several seconds after each action. For #65, use headless Chrome with a throwaway profile whose cookies content setting is 2. Stopping `flutter run` can leave its Dart process holding the port.
 - Not confirmed by hand: #62 with a real window switch, #62 on Android, and whether a key typed immediately after opening a sheet can land in the editor in a visible window (both noted in comments on #62).
 
 ## Next step
